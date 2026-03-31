@@ -257,7 +257,6 @@
   #matrix-panel {
     padding: 24px;
     overflow: auto;
-    display: flex;
     flex-direction: column;
     gap: 20px;
   }
@@ -623,6 +622,9 @@
     <button class="refresh-btn" id="refresh-btn" title="Re-analyze repo (R)">
       <span class="r-icon">⟳</span> REFRESH
     </button>
+    <button class="refresh-btn" id="export-standalone-btn" title="Export self-contained HTML file">
+      ↓ Standalone
+    </button>
   </header>
 
   <div class="tab-nav">
@@ -762,6 +764,9 @@
 <div class="tooltip" id="tooltip"></div>
 
 <script>
+// ─── STANDALONE DATA INJECTION (replaced by export tools) ────────────────────
+// __STANDALONE_DATA__
+
 // ─── FALLBACK SAMPLE DATA (used if /graph fails) ─────────────────────────────
 const SAMPLE_NODES = [
   { id: "app.py",         type: "module",   size: 420,  group: 0, imports: 5, loc: 420 },
@@ -998,10 +1003,15 @@ async function loadGraph() {
   const overlay = document.getElementById('loading-overlay');
   overlay.classList.remove('hidden');
   try {
-    const res = await fetch('/graph');
-    if (!res.ok) throw new Error('no server');
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    let data;
+    if (typeof STANDALONE_DATA !== 'undefined') {
+      data = STANDALONE_DATA;
+    } else {
+      const res = await fetch('/graph');
+      if (!res.ok) throw new Error('no server');
+      data = await res.json();
+      if (data.error) throw new Error(data.error);
+    }
     NODES = data.nodes || [];
     LINKS = data.links || [];
     META = data.meta || {};
@@ -1023,7 +1033,10 @@ async function loadGraph() {
   if (document.getElementById('treemap-panel').classList.contains('active')) initTreemap();
 }
 
-// Refresh button
+// Refresh button — hidden in standalone mode
+if (typeof STANDALONE_DATA !== 'undefined') {
+  document.getElementById('refresh-btn').style.display = 'none';
+}
 document.getElementById('refresh-btn').addEventListener('click', async () => {
   const btn = document.getElementById('refresh-btn');
   btn.classList.add('spinning');
@@ -1034,6 +1047,33 @@ document.getElementById('refresh-btn').addEventListener('click', async () => {
   await loadGraph();
   btn.classList.remove('spinning');
   btn.disabled = false;
+});
+
+// Export standalone HTML (requires server running to fetch page source)
+document.getElementById('export-standalone-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-standalone-btn');
+  btn.disabled = true;
+  btn.textContent = 'Exporting…';
+  try {
+    const pageRes = await fetch('/');
+    let html = await pageRes.text();
+    const payload = JSON.stringify({ nodes: NODES, links: LINKS, meta: META });
+    html = html.replace(
+      '// __STANDALONE_DATA__',
+      `const STANDALONE_DATA = ${payload};`
+    );
+    const blob = new Blob([html], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const repoName = (META.root || 'repo').replace(/\/$/, '');
+    a.download = `repo-viz-${repoName}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    alert('Export failed: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = '↓ Standalone';
 });
 
 // ─── TAB SWITCHING ──────────────────────────────────────────────────────────
@@ -1358,8 +1398,8 @@ function initThree() {
   threeRenderer = renderer;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 2000);
-  camera.position.set(0, 0, 280);
+  // Camera far plane and zoom limits are set after layout based on graph size
+  const camera = new THREE.PerspectiveCamera(60, W/H, 0.1, 20000);
 
   scene.add(new THREE.AmbientLight(0x334155, 2));
   const ptLight = new THREE.PointLight(0x00d4ff, 1.5, 800);
@@ -1375,14 +1415,16 @@ function initThree() {
     }
   });
 
-  // 3D positions by group shells
+  // 3D positions by group shells — use sequential index so group:9000 (external) doesn't fly off to infinity
   const pos3D = {};
   const byGroup = {};
   NODES.forEach(n => { if (!byGroup[n.group]) byGroup[n.group] = []; byGroup[n.group].push(n); });
-  Object.entries(byGroup).forEach(([grp, gnodes]) => {
-    const r = 60 + parseInt(grp) * 20;
+  const groupKeys = Object.keys(byGroup).sort((a, b) => parseInt(a) - parseInt(b));
+  groupKeys.forEach((grp, idx) => {
+    const gnodes = byGroup[grp];
+    const r = 60 + idx * 45;
     gnodes.forEach((n, i) => {
-      const phi = Math.acos(-1 + (2 * i) / gnodes.length);
+      const phi = Math.acos(-1 + (2 * i) / Math.max(gnodes.length, 1));
       const theta = Math.sqrt(gnodes.length * Math.PI) * phi;
       pos3D[n.id] = new THREE.Vector3(
         r * Math.sin(phi) * Math.cos(theta),
@@ -1391,6 +1433,15 @@ function initThree() {
       );
     });
   });
+
+  // Compute bounding sphere and fit camera
+  const allPos = Object.values(pos3D);
+  let maxR = 0;
+  allPos.forEach(p => { const d = p.length(); if (d > maxR) maxR = d; });
+  const fitDist = maxR * 2.2;
+  camera.position.set(0, 0, fitDist);
+  camera.far = fitDist * 10;
+  camera.updateProjectionMatrix();
 
   // Canvas-based sprite for labels
   function makeLabel(text, color) {
@@ -1468,7 +1519,11 @@ function initThree() {
     if (!isRightDrag) { rotY += dx * 0.007; rotX += dy * 0.007; }
     else { camera.position.x -= dx * 0.3; camera.position.y += dy * 0.3; }
   });
-  canvas.addEventListener('wheel', e => { camera.position.z = Math.max(40, Math.min(800, camera.position.z + e.deltaY * 0.25)); });
+  canvas.addEventListener('wheel', e => {
+    const minZ = maxR * 0.3;
+    const maxZ = fitDist * 4;
+    camera.position.z = Math.max(minZ, Math.min(maxZ, camera.position.z + e.deltaY * (fitDist * 0.001)));
+  });
 
   // Click to inspect
   const raycaster = new THREE.Raycaster();

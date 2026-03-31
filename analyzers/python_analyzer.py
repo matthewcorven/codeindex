@@ -32,13 +32,46 @@ def parse_imports(tree) -> list[tuple[str, str]]:
             for alias in node.names:
                 imports.append(("import", alias.name))
         elif isinstance(node, ast.ImportFrom):
+            dots = "." * (node.level or 0)
             if node.module:
-                imports.append(("from", node.module))
+                imports.append(("from", dots + node.module))
+            elif node.level:
+                # e.g. `from . import module1, module2` — module is None
+                for alias in node.names:
+                    imports.append(("from", dots + alias.name))
     return imports
 
 
 def resolve_internal(mod_name: str, file_path: Path, root: Path, all_files: set):
     """Try to map a module name to a relative .py path in the repo."""
+    # Handle relative imports (leading dots)
+    if mod_name.startswith("."):
+        level = len(mod_name) - len(mod_name.lstrip("."))
+        mod_part = mod_name[level:]
+        base = file_path.parent
+        for _ in range(level - 1):
+            base = base.parent
+        if mod_part:
+            parts = mod_part.split(".")
+            try:
+                candidates = [
+                    str((base / "/".join(parts)).relative_to(root)) + ".py",
+                    str((base / "/".join(parts) / "__init__.py").relative_to(root)),
+                ]
+            except ValueError:
+                return None
+        else:
+            # bare `from . import X` with no module part — points to the package itself
+            try:
+                c = str((base / "__init__.py").relative_to(root))
+                return c if c in all_files else None
+            except ValueError:
+                return None
+        for c in candidates:
+            if c in all_files:
+                return c
+        return None
+
     parts = mod_name.split(".")
     candidates = [
         "/".join(parts) + ".py",

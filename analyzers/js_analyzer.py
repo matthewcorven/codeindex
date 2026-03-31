@@ -242,6 +242,12 @@ def analyze(root: Path, group_map: dict):
     _ext_deps, framework, package_manager = read_package_json(root)
 
     all_rel = {str(f.relative_to(root)) for f in js_files}
+    # Also include CSS/stylesheet files so JS→CSS import links can be resolved
+    _css_exts = {".css", ".scss", ".sass", ".less", ".styl"}
+    for _ext in _css_exts:
+        for _p in root.rglob(f"*{_ext}"):
+            if not is_skip_dir(_p) and not is_ignored(_p, root, patterns):
+                all_rel.add(str(_p.relative_to(root)))
     nodes = []
     links_map = {}
     external_nodes = {}
