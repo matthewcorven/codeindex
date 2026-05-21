@@ -137,6 +137,38 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         )
 
 
+def _cmd_symbols(args: argparse.Namespace) -> None:
+    from codeindex.symbols import (
+        build_symbol_index, write_standalone, write_inline, write_claude_md,
+        SYMBOL_INDEX_FILENAME,
+    )
+    from codeindex.index import find_index, INDEX_FILENAME
+
+    repo = Path(args.repo).resolve()
+    symbol_data = build_symbol_index(str(repo))
+
+    if args.inline:
+        if args.index:
+            index_path = Path(args.index)
+        else:
+            index_path = find_index(repo)
+            if not index_path:
+                print(
+                    f"No {INDEX_FILENAME} found — run: codeindex analyze <repo> first, "
+                    "or pass --index <path>",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        write_inline(symbol_data, index_path)
+    else:
+        output = Path(args.output) if args.output else (repo / SYMBOL_INDEX_FILENAME)
+        write_standalone(symbol_data, output)
+
+    if args.claude_md:
+        claude_path = Path(args.claude_md_path) if args.claude_md_path else (repo / "CLAUDE.md")
+        write_claude_md(symbol_data, claude_path, exported_only=not args.all_symbols)
+
+
 def _cmd_install_hook(args: argparse.Namespace) -> None:
     from codeindex.hook import install
     install(
@@ -177,6 +209,33 @@ def _build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("--watch", action="store_true", help="Watch for file changes (viz mode)")
     p_serve.add_argument("--output", help="codeindex.json path override (viz mode)")
 
+    # ── symbols ────────────────────────────────────────────────────────────────
+    p_sym = sub.add_parser("symbols", help="Build a symbol index (functions, classes, exports)")
+    p_sym.add_argument("repo", nargs="?", default=".", help="Path to repo root (default: .)")
+    p_sym.add_argument(
+        "--output", help="Output path for symbolindex.json (default: <repo>/symbolindex.json)"
+    )
+    p_sym.add_argument(
+        "--inline", action="store_true",
+        help="Embed symbols into codeindex.json nodes instead of a separate file",
+    )
+    p_sym.add_argument(
+        "--index",
+        help="Path to codeindex.json for --inline mode (auto-discovered if omitted)",
+    )
+    p_sym.add_argument(
+        "--claude-md", dest="claude_md", action="store_true",
+        help="Write compressed symbol summary to CLAUDE.md (exported symbols only by default)",
+    )
+    p_sym.add_argument(
+        "--claude-md-path", dest="claude_md_path",
+        help="Path to CLAUDE.md (default: <repo>/CLAUDE.md)",
+    )
+    p_sym.add_argument(
+        "--all-symbols", dest="all_symbols", action="store_true",
+        help="Include non-exported symbols in --claude-md output (default: exported only)",
+    )
+
     # ── install-hook ───────────────────────────────────────────────────────
     p_hook = sub.add_parser("install-hook", help="Install a pre-commit hook for impact warnings")
     p_hook.add_argument("--repo", default=".", help="Repo root (default: .)")
@@ -195,6 +254,7 @@ def main() -> None:
         "analyze":      _cmd_analyze,
         "impact":       _cmd_impact,
         "serve":        _cmd_serve,
+        "symbols":      _cmd_symbols,
         "install-hook": _cmd_install_hook,
     }
     dispatch[args.command](args)
