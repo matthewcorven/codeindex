@@ -362,4 +362,4 @@ Kind abbreviations: `fn` function · `cls` class · `st` struct · `en` enum · 
 
 ## License
 
-MIT
+Apache 2.0 — free to use and build on; attribution required in derivative works and documentation. Copyright 2026 David Scheiderman.
