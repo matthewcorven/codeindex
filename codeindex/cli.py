@@ -169,6 +169,88 @@ def _cmd_symbols(args: argparse.Namespace) -> None:
         write_claude_md(symbol_data, claude_path, exported_only=not args.all_symbols)
 
 
+def _cmd_lookup(args: argparse.Namespace) -> None:
+    from codeindex.mcp_server import _find_symbol_index, _resolve_symbol_index
+    sym_data = _resolve_symbol_index(args.index)
+    name = args.name
+    matches = sym_data.get("symbols", {}).get(name, [])
+    if not matches:
+        print(f"Symbol `{name}` not found in index.", file=sys.stderr)
+        sys.exit(1)
+    if args.json:
+        print(json.dumps({"name": name, "matches": matches}, indent=2))
+    else:
+        for m in matches:
+            methods = f"  methods: {', '.join(m['methods'])}" if m.get("methods") else ""
+            print(f"{m['file']}:{m['line']}  ({m.get('kind', '?')}){methods}")
+
+
+def _cmd_dependencies(args: argparse.Namespace) -> None:
+    from codeindex.index import load, find_index, INDEX_FILENAME
+    if args.index:
+        index_path = Path(args.index)
+    else:
+        index_path = find_index(Path(args.file).parent) or find_index(Path.cwd())
+        if not index_path:
+            print(f"No {INDEX_FILENAME} found. Run: codeindex analyze <repo>", file=sys.stderr)
+            sys.exit(1)
+    data = load(index_path)
+    fp = args.file
+    clean = fp.lstrip("./")
+    node = next(
+        (n for n in data["nodes"] if n["id"] == fp or n["id"].endswith(clean) or clean.endswith(n["id"])),
+        None,
+    )
+    if not node:
+        print(f"File not found in index: {fp}", file=sys.stderr)
+        sys.exit(1)
+    if args.json:
+        print(json.dumps({
+            "file":        node["id"],
+            "imports":     node.get("imports", []),
+            "imported_by": node.get("imported_by", []),
+            "blast_score": node.get("blast_score", 0),
+        }, indent=2))
+    else:
+        print(f"File: {node['id']}  (blast score: {node.get('blast_score', 0):.1f})")
+        imports = node.get("imports", [])
+        imported_by = node.get("imported_by", [])
+        print(f"\nImports ({len(imports)}):")
+        for f in imports:
+            print(f"  {f}")
+        print(f"\nImported by ({len(imported_by)}):")
+        for f in imported_by:
+            print(f"  {f}")
+
+
+def _cmd_high_blast(args: argparse.Namespace) -> None:
+    from codeindex.index import load, find_index, INDEX_FILENAME
+    if args.index:
+        index_path = Path(args.index)
+    else:
+        index_path = find_index(Path.cwd())
+        if not index_path:
+            print(f"No {INDEX_FILENAME} found. Run: codeindex analyze <repo>", file=sys.stderr)
+            sys.exit(1)
+    data = load(index_path)
+    threshold = args.threshold
+    results = sorted(
+        [n for n in data["nodes"] if n.get("blast_score", 0) >= threshold and n.get("type") != "import"],
+        key=lambda n: n["blast_score"], reverse=True,
+    )
+    if args.json:
+        print(json.dumps({"threshold": threshold, "count": len(results), "files": [
+            {"file": n["id"], "blast_score": n["blast_score"],
+             "direct": n.get("direct_dependents", 0), "transitive": n.get("transitive_dependents", 0)}
+            for n in results
+        ]}, indent=2))
+    else:
+        print(f"Files with blast score ≥ {threshold}  ({len(results)} found)\n")
+        for n in results:
+            print(f"  {n['blast_score']:>6.1f}  {n['id']}"
+                  f"  ({n.get('direct_dependents', 0)}d / {n.get('transitive_dependents', 0)}t)")
+
+
 def _cmd_install_hook(args: argparse.Namespace) -> None:
     from codeindex.hook import install
     install(
@@ -236,6 +318,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Include non-exported symbols in --claude-md output (default: exported only)",
     )
 
+    # ── lookup ─────────────────────────────────────────────────────────────
+    p_lookup = sub.add_parser("lookup", help="Find where a symbol is defined (file + line)")
+    p_lookup.add_argument("name", help="Symbol name to look up")
+    p_lookup.add_argument("--index", help="Path to symbolindex.json (auto-discovered if omitted)")
+    p_lookup.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # ── dependencies ───────────────────────────────────────────────────────
+    p_deps = sub.add_parser("dependencies", help="Show imports and imported-by for a file")
+    p_deps.add_argument("file", help="File path to inspect")
+    p_deps.add_argument("--index", help="Path to codeindex.json (auto-discovered if omitted)")
+    p_deps.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # ── high-blast ─────────────────────────────────────────────────────────
+    p_hb = sub.add_parser("high-blast", help="List files above a blast score threshold")
+    p_hb.add_argument("--threshold", type=float, default=5.0, help="Minimum blast score (default: 5)")
+    p_hb.add_argument("--index", help="Path to codeindex.json (auto-discovered if omitted)")
+    p_hb.add_argument("--json", action="store_true", help="Output raw JSON")
+
     # ── install-hook ───────────────────────────────────────────────────────
     p_hook = sub.add_parser("install-hook", help="Install a pre-commit hook for impact warnings")
     p_hook.add_argument("--repo", default=".", help="Repo root (default: .)")
@@ -255,6 +355,9 @@ def main() -> None:
         "impact":       _cmd_impact,
         "serve":        _cmd_serve,
         "symbols":      _cmd_symbols,
+        "lookup":       _cmd_lookup,
+        "dependencies": _cmd_dependencies,
+        "high-blast":   _cmd_high_blast,
         "install-hook": _cmd_install_hook,
     }
     dispatch[args.command](args)
