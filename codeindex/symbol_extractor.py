@@ -1,7 +1,10 @@
 """Per-language symbol extraction for the codeindex symbol index."""
 from __future__ import annotations
 import ast
+import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -317,6 +320,112 @@ def extract_ruby(path: Path) -> list[dict]:
     return symbols
 
 
+# ── C# (Roslyn-first with regex fallback) ────────────────────────────────────
+
+_CSHARP_TYPE = re.compile(
+    r"^\s*(?:\[[^\]]+\]\s*)*"
+    r"(?P<mods>(?:(?:public|private|protected|internal|static|abstract|sealed|partial|readonly|unsafe|new)\s+)*)"
+    r"(?P<kind>class|interface|struct|enum|delegate|record(?:\s+class|\s+struct)?)\s+"
+    r"(?P<name>@?\w+)",
+    re.MULTILINE,
+)
+_CSHARP_METHOD = re.compile(
+    r"^\s*(?:\[[^\]]+\]\s*)*"
+    r"(?P<mods>(?:(?:public|private|protected|internal|static|virtual|override|abstract|sealed|async|extern|unsafe|new|partial)\s+)+)"
+    r"(?:[\w<>\[\],\.\?]+\s+)+(?P<name>@?\w+)\s*\(",
+    re.MULTILINE,
+)
+_CSHARP_NOISE = {"if", "for", "while", "switch", "foreach", "catch", "lock", "using", "return"}
+
+
+def _extract_csharp_roslyn(path: Path) -> list[dict] | None:
+    tool = shutil.which("codeindex-csharp-symbols")
+    if not tool:
+        return None
+    try:
+        result = subprocess.run(
+            [tool, str(path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        parsed = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, list):
+        return None
+    symbols: list[dict] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        line = item.get("line")
+        kind = item.get("kind", "class")
+        if not isinstance(name, str) or not isinstance(line, int):
+            continue
+        symbol = {
+            "name": name,
+            "line": line,
+            "kind": str(kind),
+            "exported": bool(item.get("exported", True)),
+        }
+        if isinstance(item.get("methods"), list):
+            symbol["methods"] = [m for m in item["methods"] if isinstance(m, str)]
+        if isinstance(item.get("doc"), str) and item["doc"]:
+            symbol["doc"] = item["doc"][:80]
+        symbols.append(symbol)
+    return symbols
+
+
+def extract_csharp(path: Path) -> list[dict]:
+    roslyn_symbols = _extract_csharp_roslyn(path)
+    if roslyn_symbols is not None:
+        return roslyn_symbols
+    try:
+        source = path.read_text(errors="replace")
+    except OSError:
+        return []
+
+    symbols = []
+    seen: set[str] = set()
+
+    for m in _CSHARP_TYPE.finditer(source):
+        name = m.group("name")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        mods = m.group("mods") or ""
+        raw_kind = m.group("kind") or "class"
+        kind = "class" if raw_kind.startswith("record") else raw_kind
+        symbols.append({
+            "name": name,
+            "line": _line_of(source, m.start()),
+            "kind": kind,
+            "exported": "public" in mods.split(),
+        })
+
+    for m in _CSHARP_METHOD.finditer(source):
+        name = m.group("name")
+        if not name or name in seen or name in _CSHARP_NOISE:
+            continue
+        seen.add(name)
+        mods = m.group("mods") or ""
+        symbols.append({
+            "name": name,
+            "line": _line_of(source, m.start()),
+            "kind": "function",
+            "exported": "public" in mods.split(),
+        })
+
+    return symbols
+
+
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 
 EXTRACTORS: dict[str, callable] = {
@@ -335,6 +444,7 @@ EXTRACTORS: dict[str, callable] = {
     ".rs":   extract_rust,
     ".php":  extract_php,
     ".rb":   extract_ruby,
+    ".cs":   extract_csharp,
 }
 
 

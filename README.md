@@ -421,6 +421,7 @@ codeindex impact src/auth.py
 | Ruby | `require`, `require_relative`, `autoload` | Classes, modules, methods |
 | Rust | `mod`, `use crate::` | `pub fn`, structs, enums, traits |
 | Java / Kotlin | FQN imports, wildcard imports | Classes, interfaces, methods |
+| C# | — | Roslyn-first extraction via `codeindex-csharp-symbols` (if installed), regex fallback for types/methods |
 | PHP | PSR-4 namespace resolution | Classes, interfaces, functions |
 | CSS / SCSS / Less | `@import`, `@use`, `@forward` | — |
 | Docker | Services, `depends_on` edges | — |

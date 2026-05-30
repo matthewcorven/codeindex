@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- C# symbol extraction in `codeindex symbols` (`.cs`): Roslyn-first via optional `codeindex-csharp-symbols`, with built-in regex fallback
+
 ## [0.2.0] - 2026-05-24
 
 ### Added
