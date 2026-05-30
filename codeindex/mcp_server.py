@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+from codeindex import __version__
 from codeindex.index import build, load, find_index, INDEX_FILENAME
 from codeindex.impact import compute_blast_radius
 from codeindex.reporter import format_markdown
@@ -85,7 +86,7 @@ TOOLS = [
         "name": "lookup_symbol",
         "description": (
             "Find where a function, class, struct, or other symbol is defined. "
-            "Returns file path and line number via O(1) index lookup — no file scanning. "
+            "Returns file path, line number, and any available provenance metadata via O(1) index lookup — no file scanning. "
             "Requires symbolindex.json (run build_symbol_index first)."
         ),
         "inputSchema": {
@@ -101,6 +102,99 @@ TOOLS = [
                 },
             },
             "required": ["name"],
+        },
+    },
+    {
+        "name": "get_symbol_metadata",
+        "description": (
+            "Return provenance metadata for a symbol, including extraction mode, extractor, "
+            "confidence, and symbol index schema metadata when available."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Exact symbol name to inspect.",
+                },
+                "symbol_index_path": {
+                    "type": "string",
+                    "description": "Path to symbolindex.json. Auto-discovered if omitted.",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "verify_repo_health",
+        "description": (
+            "Check codeindex.json and symbolindex.json health, including schema metadata, "
+            "freshness, diagnostics, and missing artifacts."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {
+                    "type": "string",
+                    "description": "Absolute or relative path to the repo root. Default: current working directory.",
+                },
+                "index_path": {
+                    "type": "string",
+                    "description": "Path to codeindex.json. Default: <repo>/codeindex.json.",
+                },
+                "symbol_index_path": {
+                    "type": "string",
+                    "description": "Path to symbolindex.json. Default: <repo>/symbolindex.json.",
+                },
+                "max_age_days": {
+                    "type": "number",
+                    "description": "Warn when indexes are older than this many days. Default: 7.",
+                },
+            },
+        },
+    },
+    {
+        "name": "run_ci_check",
+        "description": (
+            "Run a CI/PR preflight check that combines index health, freshness, diagnostics, "
+            "and changed-file blast-radius warnings."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {
+                    "type": "string",
+                    "description": "Absolute or relative path to the repo root. Default: current working directory.",
+                },
+                "base_ref": {
+                    "type": "string",
+                    "description": "Git base ref for PR diffs, such as origin/main or HEAD.",
+                },
+                "index_path": {
+                    "type": "string",
+                    "description": "Path to codeindex.json. Default: <repo>/codeindex.json.",
+                },
+                "symbol_index_path": {
+                    "type": "string",
+                    "description": "Path to symbolindex.json. Default: <repo>/symbolindex.json.",
+                },
+                "max_age_days": {
+                    "type": "number",
+                    "description": "Warn when indexes are older than this many days. Default: 7.",
+                },
+                "blast_threshold": {
+                    "type": "number",
+                    "description": "Warn when changed files meet this blast score. Default: 10.",
+                },
+                "strict": {
+                    "type": "boolean",
+                    "description": "Treat warnings as failures.",
+                },
+                "include_untracked": {
+                    "type": "boolean",
+                    "description": "Include untracked files in local changed-file checks.",
+                },
+            },
         },
     },
     {
@@ -246,6 +340,42 @@ def _call_lookup_symbol(params: dict) -> dict:
                 "kind":     m.get("kind", "?"),
                 "exported": m.get("exported", True),
                 "methods":  m.get("methods", []),
+                "analysisMode": m.get("analysisMode"),
+                "extractor": m.get("extractor"),
+                "extractorVersion": m.get("extractorVersion"),
+                "confidence": m.get("confidence"),
+            }
+            for m in matches
+        ],
+    }
+
+
+def _call_get_symbol_metadata(params: dict) -> dict:
+    sym_data = _resolve_symbol_index(params.get("symbol_index_path"))
+    name = params["name"]
+    matches = sym_data.get("symbols", {}).get(name, [])
+    if not matches:
+        return {
+            "found": False,
+            "name": name,
+            "matches": [],
+            "indexMeta": sym_data.get("meta", {}),
+        }
+    return {
+        "found": True,
+        "name": name,
+        "indexMeta": sym_data.get("meta", {}),
+        "matches": [
+            {
+                "file": m.get("file"),
+                "line": m.get("line"),
+                "kind": m.get("kind", "?"),
+                "analysisMode": m.get("analysisMode"),
+                "extractor": m.get("extractor"),
+                "extractorVersion": m.get("extractorVersion"),
+                "confidence": m.get("confidence"),
+                "schemaVersion": m.get("schemaVersion"),
+                "diagnostics": m.get("diagnostics", []),
             }
             for m in matches
         ],
@@ -263,7 +393,37 @@ def _call_build_symbol_index(params: dict) -> dict:
         "total_symbols": symbol_data["meta"]["total_symbols"],
         "files":         len(symbol_data["file_symbols"]),
         "output":        str(out),
+        "schemaVersion": symbol_data.get("schemaVersion"),
+        "analysisModes": symbol_data["meta"].get("analysisModes", {}),
+        "confidence":    symbol_data["meta"].get("confidence", {}),
+        "diagnostics":   symbol_data["meta"].get("diagnostics", []),
     }
+
+
+def _call_verify_repo_health(params: dict) -> dict:
+    from codeindex.doctor import inspect_repo  # noqa: PLC0415
+
+    return inspect_repo(
+        params.get("repo_path", "."),
+        index_path=params.get("index_path"),
+        symbol_index_path=params.get("symbol_index_path"),
+        max_age_days=int(params.get("max_age_days", 7)),
+    )
+
+
+def _call_run_ci_check(params: dict) -> dict:
+    from codeindex.ci import run_ci_check  # noqa: PLC0415
+
+    return run_ci_check(
+        params.get("repo_path", "."),
+        base_ref=params.get("base_ref"),
+        index_path=params.get("index_path"),
+        symbol_index_path=params.get("symbol_index_path"),
+        max_age_days=int(params.get("max_age_days", 7)),
+        blast_threshold=float(params.get("blast_threshold", 10)),
+        strict=bool(params.get("strict", False)),
+        include_untracked=bool(params.get("include_untracked", False)),
+    )
 
 
 _HANDLERS = {
@@ -272,6 +432,9 @@ _HANDLERS = {
     "get_dependencies":    _call_get_dependencies,
     "get_high_blast_files": _call_get_high_blast_files,
     "lookup_symbol":       _call_lookup_symbol,
+    "get_symbol_metadata": _call_get_symbol_metadata,
+    "verify_repo_health":  _call_verify_repo_health,
+    "run_ci_check":        _call_run_ci_check,
     "build_symbol_index":  _call_build_symbol_index,
 }
 
@@ -296,7 +459,7 @@ def _handle(msg: dict) -> dict | None:
         return ok({
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "codeindex", "version": "0.1.0"},
+            "serverInfo": {"name": "codeindex", "version": __version__},
         })
 
     if method == "notifications/initialized":

@@ -261,6 +261,44 @@ def _cmd_install_hook(args: argparse.Namespace) -> None:
     )
 
 
+def _cmd_doctor(args: argparse.Namespace) -> None:
+    from codeindex.doctor import format_doctor_report, inspect_repo
+
+    report = inspect_repo(
+        args.repo,
+        index_path=args.index,
+        symbol_index_path=args.symbol_index,
+        max_age_days=args.max_age_days,
+    )
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(format_doctor_report(report))
+    if report["summary"]["errors"]:
+        sys.exit(1)
+
+
+def _cmd_ci(args: argparse.Namespace) -> None:
+    from codeindex.ci import format_ci_report, run_ci_check
+
+    report = run_ci_check(
+        args.repo,
+        base_ref=args.base,
+        index_path=args.index,
+        symbol_index_path=args.symbol_index,
+        max_age_days=args.max_age_days,
+        blast_threshold=args.blast_threshold,
+        strict=args.strict,
+        include_untracked=args.include_untracked,
+    )
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(format_ci_report(report))
+    if report["status"] == "error":
+        sys.exit(1)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="codeindex",
@@ -343,6 +381,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p_hook.add_argument("--strict", action="store_true", help="Block commit when threshold exceeded")
     p_hook.add_argument("--remove", action="store_true", help="Remove the installed hook")
 
+    # ── doctor ─────────────────────────────────────────────────────────────
+    p_doctor = sub.add_parser("doctor", help="Check index health, metadata, freshness, and diagnostics")
+    p_doctor.add_argument("repo", nargs="?", default=".", help="Repo root (default: .)")
+    p_doctor.add_argument("--index", help="Path to codeindex.json (default: <repo>/codeindex.json)")
+    p_doctor.add_argument("--symbol-index", dest="symbol_index", help="Path to symbolindex.json (default: <repo>/symbolindex.json)")
+    p_doctor.add_argument("--max-age-days", type=int, default=7, help="Warn when indexes are older than this many days")
+    p_doctor.add_argument("--json", action="store_true", help="Output raw JSON")
+
+    # ── ci ─────────────────────────────────────────────────────────────────
+    p_ci = sub.add_parser("ci", help="Run CI/PR preflight checks for index health and changed-file blast risk")
+    p_ci.add_argument("repo", nargs="?", default=".", help="Repo root (default: .)")
+    p_ci.add_argument("--base", help="Git base ref for PR diffs, such as origin/main or HEAD")
+    p_ci.add_argument("--index", help="Path to codeindex.json (default: <repo>/codeindex.json)")
+    p_ci.add_argument("--symbol-index", dest="symbol_index", help="Path to symbolindex.json (default: <repo>/symbolindex.json)")
+    p_ci.add_argument("--max-age-days", type=int, default=7, help="Warn when indexes are older than this many days")
+    p_ci.add_argument("--blast-threshold", type=float, default=10.0, help="Warn when changed files meet this blast score (default: 10)")
+    p_ci.add_argument("--include-untracked", action="store_true", help="Include untracked files in local changed-file checks")
+    p_ci.add_argument("--strict", action="store_true", help="Exit non-zero when warnings are present")
+    p_ci.add_argument("--json", action="store_true", help="Output raw JSON")
+
     return parser
 
 
@@ -359,6 +417,8 @@ def main() -> None:
         "dependencies": _cmd_dependencies,
         "high-blast":   _cmd_high_blast,
         "install-hook": _cmd_install_hook,
+        "doctor":       _cmd_doctor,
+        "ci":           _cmd_ci,
     }
     dispatch[args.command](args)
 

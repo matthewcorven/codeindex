@@ -6,6 +6,31 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Callable
+
+SYMBOL_SCHEMA_VERSION = 1
+EXTRACTOR_VERSION = "1"
+
+
+def _with_symbol_metadata(
+    symbols: list[dict],
+    analysis_mode: str,
+    extractor: str,
+    confidence: float,
+    diagnostics: list[str] | None = None,
+) -> list[dict]:
+    enriched = []
+    for symbol in symbols:
+        item = dict(symbol)
+        item.setdefault("analysisMode", analysis_mode)
+        item.setdefault("extractor", extractor)
+        item.setdefault("extractorVersion", EXTRACTOR_VERSION)
+        item.setdefault("confidence", confidence)
+        item.setdefault("schemaVersion", SYMBOL_SCHEMA_VERSION)
+        if diagnostics:
+            item.setdefault("diagnostics", diagnostics)
+        enriched.append(item)
+    return enriched
 
 
 def _line_of(source: str, pos: int) -> int:
@@ -52,7 +77,7 @@ def extract_python(path: Path) -> list[dict]:
             if doc:
                 sym["doc"] = doc.split("\n")[0][:80]
             symbols.append(sym)
-    return symbols
+    return _with_symbol_metadata(symbols, "ast", "python-ast", 0.95)
 
 
 # ── JavaScript / TypeScript / Vue ─────────────────────────────────────────────
@@ -101,7 +126,7 @@ def extract_js(path: Path) -> list[dict]:
                     "exported": True,
                 })
 
-    return symbols
+    return _with_symbol_metadata(symbols, "regex", "javascript-regex", 0.70)
 
 
 # ── Go ────────────────────────────────────────────────────────────────────────
@@ -143,7 +168,7 @@ def extract_go(path: Path) -> list[dict]:
                     "exported": name[0].isupper(),
                 })
 
-    return symbols
+    return _with_symbol_metadata(symbols, "regex", "go-regex", 0.75)
 
 
 # ── Java / Kotlin ─────────────────────────────────────────────────────────────
@@ -208,7 +233,8 @@ def extract_java(path: Path) -> list[dict]:
                 "exported": True,
             })
 
-    return symbols
+    extractor = "kotlin-regex" if is_kotlin else "java-regex"
+    return _with_symbol_metadata(symbols, "regex", extractor, 0.70)
 
 
 # ── Rust ─────────────────────────────────────────────────────────────────────
@@ -247,7 +273,7 @@ def extract_rust(path: Path) -> list[dict]:
                     "exported": m.group(0).startswith("pub"),
                 })
 
-    return symbols
+    return _with_symbol_metadata(symbols, "regex", "rust-regex", 0.75)
 
 
 # ── PHP ───────────────────────────────────────────────────────────────────────
@@ -282,7 +308,7 @@ def extract_php(path: Path) -> list[dict]:
                     "exported": True,
                 })
 
-    return symbols
+    return _with_symbol_metadata(symbols, "regex", "php-regex", 0.70)
 
 
 # ── Ruby ─────────────────────────────────────────────────────────────────────
@@ -317,7 +343,7 @@ def extract_ruby(path: Path) -> list[dict]:
                     "exported": True,
                 })
 
-    return symbols
+    return _with_symbol_metadata(symbols, "regex", "ruby-regex", 0.70)
 
 
 # ── C# (Roslyn-first with regex fallback) ────────────────────────────────────
@@ -386,7 +412,7 @@ def _extract_csharp_roslyn(path: Path) -> list[dict] | None:
 def extract_csharp(path: Path) -> list[dict]:
     roslyn_symbols = _extract_csharp_roslyn(path)
     if roslyn_symbols is not None:
-        return roslyn_symbols
+        return _with_symbol_metadata(roslyn_symbols, "roslyn", "codeindex-csharp-symbols", 0.98)
     try:
         source = path.read_text(errors="replace")
     except OSError:
@@ -423,12 +449,12 @@ def extract_csharp(path: Path) -> list[dict]:
             "exported": "public" in mods.split(),
         })
 
-    return symbols
+    return _with_symbol_metadata(symbols, "regex", "csharp-regex", 0.70)
 
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 
-EXTRACTORS: dict[str, callable] = {
+EXTRACTORS: dict[str, Callable[[Path], list[dict]]] = {
     ".py":   extract_python,
     ".js":   extract_js,
     ".jsx":  extract_js,

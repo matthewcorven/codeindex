@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-MCP server integration test — exercises all 6 tools via real JSON-RPC stdio.
+MCP server integration test — exercises all MCP tools via real JSON-RPC stdio.
 
 Usage:
   python benchmark/test_mcp.py [--repo PATH] [--codeindex PATH]
 
 Starts the MCP server as a subprocess, sends JSON-RPC messages, validates responses.
-All 6 tools tested: analyze_repo, get_impact, get_dependencies,
-get_high_blast_files, build_symbol_index, lookup_symbol.
 """
 from __future__ import annotations
 
@@ -143,7 +141,8 @@ def test_tools_list(client: MCPClient, r: Results) -> None:
     r.check("no error", "error" not in resp, str(resp.get("error")))
     tools = {t["name"] for t in resp.get("result", {}).get("tools", [])}
     for name in ["analyze_repo", "get_impact", "get_dependencies",
-                 "get_high_blast_files", "build_symbol_index", "lookup_symbol"]:
+                 "get_high_blast_files", "build_symbol_index", "lookup_symbol",
+                 "get_symbol_metadata", "verify_repo_health", "run_ci_check"]:
         r.check(f"tool registered: {name}", name in tools)
 
 
@@ -239,6 +238,54 @@ def test_lookup_symbol(client: MCPClient, r: Results, symbols: list[tuple[str, s
     r.check("unknown symbol returns found=false", data3.get("found") is False, str(data3))
 
 
+def test_get_symbol_metadata(client: MCPClient, r: Results, symbols: list[tuple[str, str, int]]) -> None:
+    print("\n── get_symbol_metadata ──")
+    if not symbols:
+        r.check("probe symbols available", False, "symbolindex.json has no symbols")
+        return
+
+    sym_name = symbols[0][0]
+    resp = client.call_tool("get_symbol_metadata", {"name": sym_name})
+    r.check("no error", not _is_error(resp), _result_text(resp))
+    data = _result_data(resp)
+    r.check("found=true", data.get("found") is True, str(data))
+    r.check("index meta present", isinstance(data.get("indexMeta"), dict), str(data))
+    matches = data.get("matches", [])
+    r.check("matches list present", isinstance(matches, list) and bool(matches), str(data))
+    if matches:
+        first = matches[0]
+        r.check("analysisMode present", "analysisMode" in first, str(first))
+        r.check("extractor present", "extractor" in first, str(first))
+        r.check("confidence present", "confidence" in first, str(first))
+
+    resp2 = client.call_tool("get_symbol_metadata", {"name": "__nonexistent_symbol_xyz__"})
+    data2 = _result_data(resp2)
+    r.check("unknown symbol returns found=false", data2.get("found") is False, str(data2))
+
+
+def test_verify_repo_health(client: MCPClient, r: Results, repo: str) -> None:
+    print("\n── verify_repo_health ──")
+    resp = client.call_tool("verify_repo_health", {"repo_path": repo})
+    r.check("no error", not _is_error(resp), _result_text(resp))
+    data = _result_data(resp)
+    r.check("ok field present", "ok" in data, str(data))
+    r.check("status present", data.get("status") in {"ok", "warning", "error"}, str(data))
+    r.check("summary present", isinstance(data.get("summary"), dict), str(data))
+    r.check("checks list present", isinstance(data.get("checks"), list), str(data))
+
+
+def test_run_ci_check(client: MCPClient, r: Results, repo: str) -> None:
+    print("\n── run_ci_check ──")
+    resp = client.call_tool("run_ci_check", {"repo_path": repo, "base_ref": "HEAD"})
+    r.check("no error", not _is_error(resp), _result_text(resp))
+    data = _result_data(resp)
+    r.check("status present", data.get("status") in {"ok", "warning", "error"}, str(data))
+    r.check("summary present", isinstance(data.get("summary"), dict), str(data))
+    r.check("changes present", isinstance(data.get("changes"), dict), str(data))
+    r.check("blast present", isinstance(data.get("blast"), dict), str(data))
+    r.check("checks list present", isinstance(data.get("checks"), list), str(data))
+
+
 def test_unknown_tool(client: MCPClient, r: Results) -> None:
     print("\n── error handling ──")
     resp = client.call_tool("nonexistent_tool", {})
@@ -307,6 +354,9 @@ def main() -> None:
         test_get_high_blast_files(client, r)
         test_build_symbol_index(client, r, repo)
         test_lookup_symbol(client, r, probe_symbols)
+        test_get_symbol_metadata(client, r, probe_symbols)
+        test_verify_repo_health(client, r, repo)
+        test_run_ci_check(client, r, repo)
         test_unknown_tool(client, r)
     finally:
         client.close()

@@ -1,0 +1,14 @@
+{
+  "nonStrictWarnings": {
+    "ok": true,
+    "status": "warning"
+  },
+  "strictWarnings": {
+    "ok": false,
+    "status": "error"
+  },
+  "missingIndex": {
+    "ok": false,
+    "status": "error"
+  }
+}

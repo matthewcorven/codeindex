@@ -7,6 +7,7 @@ Point it at any project — Python, JavaScript/TypeScript, Go, Ruby, Rust, Java,
 - A `codeindex.json` dependency index written directly into your repo
 - Per-file blast-radius scores (how many files break if this one changes)
 - A `symbolindex.json` symbol map so AI can find any function/class without scanning every file
+- Trust metadata for symbol extraction: schema version, extractor, analysis mode, confidence, and generation time
 - Five ways to consume the data: CLI, markdown report, MCP server, pre-commit hook, CLAUDE.md injection
 - An interactive visualization UI (2D/3D graphs, dependency matrix, treemap)
 
@@ -42,6 +43,12 @@ codeindex symbols ./myapp
 # See blast radius for a file before touching it
 codeindex impact src/auth.py
 
+# Check index health, freshness, and trust metadata
+codeindex doctor ./myapp
+
+# Run a PR/CI preflight against changed files
+codeindex ci ./myapp --base origin/main
+
 # Launch the visualization UI
 codeindex serve --viz --repo ./myapp
 open http://localhost:8080
@@ -60,7 +67,7 @@ codeindex analyze [REPO_PATH] [--output PATH] [--watch]
 Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ languages automatically.
 
 | Flag | Default | Description |
-|------|---------|-------------|
+| ---- | ------- | ----------- |
 | `REPO_PATH` | `.` | Path to repo root |
 | `--output` | `<repo>/codeindex.json` | Override output path |
 | `--watch` | off | Re-index on file changes (requires `watchdog`) |
@@ -76,10 +83,12 @@ codeindex symbols [REPO_PATH] [--output PATH] [--inline] [--index PATH]
 
 Builds a symbol index — a map of every function, class, struct, and type to its exact file and line number. Lets AI tools (and humans) find any symbol in one lookup instead of scanning the entire repo.
 
+Symbol entries include provenance metadata such as `analysisMode`, `extractor`, and `confidence`. This lets humans and agents distinguish parser/compiler-backed results from regex fallbacks, with benchmark fixtures guarding the current language confidence bands.
+
 **Modes:**
 
 | Flag | Description |
-|------|-------------|
+| ---- | ----------- |
 | _(none)_ | Write a standalone `symbolindex.json` |
 | `--inline` | Embed symbols into each node in `codeindex.json` instead |
 | `--claude-md` | Append a compressed symbol summary to `CLAUDE.md` |
@@ -89,7 +98,7 @@ Both `--inline` and `--claude-md` can be combined in a single run.
 **Options:**
 
 | Flag | Default | Description |
-|------|---------|-------------|
+| ---- | ------- | ----------- |
 | `REPO_PATH` | `.` | Path to repo root |
 | `--output` | `<repo>/symbolindex.json` | Output path (standalone mode) |
 | `--index` | auto-discovered | Path to `codeindex.json` (for `--inline`) |
@@ -129,7 +138,7 @@ codeindex impact FILE [--index PATH] [--out FILE] [--json]
 
 Shows the blast-radius impact for a specific file: direct dependents, transitive dependents, blast score, and risk level.
 
-```
+```text
 Impact: src/auth.py
 Blast Score: 8.5  (2 direct · 7 transitive)  [HIGH]
 
@@ -148,7 +157,7 @@ Risk: HIGH — affects 7/42 files (16.7% of codebase)
 **Blast score formula:** `direct + (0.5 × transitive)`
 
 | Flag | Description |
-|------|-------------|
+| ---- | ----------- |
 | `--index PATH` | Path to `codeindex.json` (auto-discovered if omitted) |
 | `--out FILE` | Write a markdown report to this file |
 | `--json` | Output raw JSON |
@@ -169,13 +178,16 @@ codeindex serve --mcp
 **MCP tools:**
 
 | Tool | Description |
-|------|-------------|
+| ---- | ----------- |
 | `analyze_repo` | Build or refresh the dependency index |
 | `get_impact` | Blast-radius report for a file |
 | `get_dependencies` | imports + imported-by for a file |
 | `get_high_blast_files` | All files above a blast score threshold |
 | `build_symbol_index` | Build or refresh the symbol index |
 | `lookup_symbol` | Find where any function/class/type is defined (file + line) |
+| `get_symbol_metadata` | Inspect symbol extraction mode, extractor, and confidence |
+| `verify_repo_health` | Check index presence, schema metadata, freshness, and diagnostics |
+| `run_ci_check` | Run index health plus changed-file blast checks for PR/CI workflows |
 
 **Claude Code MCP config** (`.claude/settings.json`):
 
@@ -200,7 +212,7 @@ codeindex lookup SYMBOL [--index PATH] [--json]
 
 Finds where a function, class, struct, or other symbol is defined. O(1) lookup against `symbolindex.json` — no file scanning.
 
-```
+```text
 $ codeindex lookup compute_blast_radius
 codeindex/impact.py:6  (function)
 
@@ -209,7 +221,7 @@ src/auth.py:44  (class)  methods: login, logout, refresh
 ```
 
 | Flag | Description |
-|------|-------------|
+| ---- | ----------- |
 | `--index PATH` | Path to `symbolindex.json` (auto-discovered if omitted) |
 | `--json` | Output raw JSON |
 
@@ -223,7 +235,7 @@ codeindex dependencies FILE [--index PATH] [--json]
 
 Shows what a file imports and what imports it, plus its blast score.
 
-```
+```text
 $ codeindex dependencies src/auth.py
 File: src/auth.py  (blast score: 8.5)
 
@@ -238,7 +250,7 @@ Imported by (2):
 ```
 
 | Flag | Description |
-|------|-------------|
+| ---- | ----------- |
 | `--index PATH` | Path to `codeindex.json` (auto-discovered if omitted) |
 | `--json` | Output raw JSON |
 
@@ -252,7 +264,7 @@ codeindex high-blast [--threshold N] [--index PATH] [--json]
 
 Lists all files whose blast score exceeds the threshold, sorted by score descending. Useful for identifying the riskiest files before a refactor.
 
-```
+```text
 $ codeindex high-blast --threshold 5
 Files with blast score ≥ 5.0  (3 found)
 
@@ -264,9 +276,52 @@ Files with blast score ≥ 5.0  (3 found)
 `d` = direct dependents · `t` = transitive dependents
 
 | Flag | Default | Description |
-|------|---------|-------------|
+| ---- | ------- | ----------- |
 | `--threshold N` | `5` | Minimum blast score to include |
 | `--index PATH` | auto-discovered | Path to `codeindex.json` |
+| `--json` | off | Output raw JSON |
+
+---
+
+### `codeindex doctor`
+
+```bash
+codeindex doctor [REPO_PATH] [--index PATH] [--symbol-index PATH]
+                 [--max-age-days N] [--json]
+```
+
+Checks whether generated indexes exist, include schema and freshness metadata, and report diagnostics. Use this before wiring codeindex into CI or agent workflows.
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `REPO_PATH` | `.` | Path to repo root |
+| `--index` | `<repo>/codeindex.json` | Override dependency index path |
+| `--symbol-index` | `<repo>/symbolindex.json` | Override symbol index path |
+| `--max-age-days` | `7` | Warn when indexes are older than this many days |
+| `--json` | off | Output raw JSON |
+
+---
+
+### `codeindex ci`
+
+```bash
+codeindex ci [REPO_PATH] [--base REF] [--index PATH] [--symbol-index PATH]
+             [--max-age-days N] [--blast-threshold N]
+             [--include-untracked] [--strict] [--json]
+```
+
+Runs a CI-friendly preflight: `doctor` health checks plus changed-file blast-radius warnings. By default, warnings do not fail the command. Add `--strict` when a team is ready to make stale indexes or high-blast changes block a PR.
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `REPO_PATH` | `.` | Path to repo root |
+| `--base REF` | local staged/unstaged diff | Compare committed changes against a PR base such as `origin/main` |
+| `--index` | `<repo>/codeindex.json` | Override dependency index path |
+| `--symbol-index` | `<repo>/symbolindex.json` | Override symbol index path |
+| `--max-age-days` | `7` | Warn when indexes are older than this many days |
+| `--blast-threshold N` | `10` | Warn when changed files meet or exceed this blast score |
+| `--include-untracked` | off | Include untracked files in local changed-file checks |
+| `--strict` | off | Exit non-zero when warnings are present |
 | `--json` | off | Output raw JSON |
 
 ---
@@ -280,7 +335,7 @@ codeindex install-hook [--repo PATH] [--threshold N] [--strict] [--remove]
 Installs a git pre-commit hook that warns when staged files exceed the blast score threshold.
 
 | Flag | Default | Description |
-|------|---------|-------------|
+| ---- | ------- | ----------- |
 | `--threshold N` | `10` | Blast score above which to warn |
 | `--strict` | off | Block the commit instead of just warning |
 | `--remove` | — | Uninstall the hook |
@@ -296,6 +351,7 @@ Three workflows, ordered by automation level.
 Claude gets symbol lookup, dependency, and impact tools it calls automatically. No extra prompting needed.
 
 **One-time setup:**
+
 ```bash
 cd /your/other/repo
 codeindex analyze .
@@ -320,15 +376,17 @@ claude mcp add --scope project codeindex -- /opt/homebrew/Caskroom/miniforge/bas
 ```
 
 Verify it registered:
+
 ```bash
 claude mcp list
 ```
 
 > **Note:** Do not use `"command": "codeindex"` with a bare name — Claude Code does not inherit your shell PATH, so the binary won't be found unless you use the absolute path.
 
-Claude now has all 6 MCP tools available in every session. When it needs to find `processPayment`, it calls `lookup_symbol("processPayment")` and gets `src/billing.py:142` back in one shot — no file scanning.
+Claude now has all 9 MCP tools available in every session. When it needs to find `processPayment`, it calls `lookup_symbol("processPayment")` and gets `src/billing.py:142` plus provenance metadata back in one shot — no file scanning.
 
 **Keep the index fresh:**
+
 ```bash
 # Auto-rebuild on file changes (leave running in a terminal)
 codeindex symbols . --watch
@@ -350,6 +408,7 @@ This upserts a `symbolindex` code fence into `CLAUDE.md`. Every Claude Code sess
 **Tradeoff:** adds ~500–2000 tokens to every prompt depending on repo size. Worth it for repos where symbol lookups are frequent; skip it for repos where you mostly write new code.
 
 **Keep it fresh:**
+
 ```bash
 # Re-run after significant refactors
 codeindex analyze . && codeindex symbols . --claude-md
@@ -367,6 +426,7 @@ codeindex symbols .
 ```
 
 Then add to `CLAUDE.md`:
+
 ```markdown
 ## Codeindex
 Symbol index: `symbolindex.json` — use the `lookup_symbol` MCP tool before grepping for any function or class.
@@ -401,7 +461,7 @@ codeindex impact src/auth.py
 ### Which workflow to pick
 
 | Situation | Workflow |
-|-----------|----------|
+| --------- | -------- |
 | Daily driver repo, active feature work | MCP server |
 | Medium repo, frequent symbol lookups | CLAUDE.md injection |
 | Large repo (1000+ files) | MCP server + short CLAUDE.md hint |
@@ -413,7 +473,7 @@ codeindex impact src/auth.py
 ## Supported Languages
 
 | Language | Dependency analysis | Symbol extraction |
-|----------|--------------------|--------------------|
+| -------- | ------------------- | ----------------- |
 | Python | AST imports, type detection | Functions, classes, methods (AST-precise) |
 | JavaScript / TypeScript | ES modules, `require()`, framework detection | Exported functions, classes, types, enums, consts |
 | Vue | SFC `<script>` imports | Exported symbols from `<script>` block |
@@ -421,7 +481,7 @@ codeindex impact src/auth.py
 | Ruby | `require`, `require_relative`, `autoload` | Classes, modules, methods |
 | Rust | `mod`, `use crate::` | `pub fn`, structs, enums, traits |
 | Java / Kotlin | FQN imports, wildcard imports | Classes, interfaces, methods |
-| C# | — | Roslyn-first extraction via `codeindex-csharp-symbols` (if installed), regex fallback for types/methods |
+| C# | — | Roslyn-first extraction via `codeindex-csharp-symbols` (if installed), visible regex fallback for types/methods |
 | PHP | PSR-4 namespace resolution | Classes, interfaces, functions |
 | CSS / SCSS / Less | `@import`, `@use`, `@forward` | — |
 | Docker | Services, `depends_on` edges | — |
@@ -436,11 +496,16 @@ codeindex impact src/auth.py
 
 ```json
 {
+  "schemaVersion": 1,
   "meta": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-05-30T12:00:00Z",
+    "toolVersion": "0.2.0",
     "root": "myapp/",
     "total_files": 60,
     "total_loc": 4085,
-    "languages": ["python", "javascript"]
+    "languages": ["python", "javascript"],
+    "diagnostics": []
   },
   "nodes": [
     {
@@ -455,9 +520,11 @@ codeindex impact src/auth.py
       "transitive_dependents": 7,
       "blast_score": 5.5,
       "symbols": [
-        { "name": "verify_token", "line": 18, "kind": "function", "exported": true },
+        { "name": "verify_token", "line": 18, "kind": "function", "exported": true,
+          "analysisMode": "ast", "extractor": "python-ast", "confidence": 0.95 },
         { "name": "AuthService",  "line": 44, "kind": "class",    "exported": true,
-          "methods": ["login", "logout", "refresh"] }
+          "methods": ["login", "logout", "refresh"],
+          "analysisMode": "ast", "extractor": "python-ast", "confidence": 0.95 }
       ]
     }
   ],
@@ -475,10 +542,17 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
 
 ```json
 {
+  "schemaVersion": 1,
   "meta": {
+    "schemaVersion": 1,
     "generated": "2026-05-21",
+    "generatedAt": "2026-05-21T12:00:00Z",
     "repo": "myapp/",
-    "total_symbols": 312
+    "total_symbols": 312,
+    "toolVersion": "0.2.0",
+    "analysisModes": { "python": { "ast": 312 } },
+    "confidence": { "average": 0.95, "bands": { "high": 312, "medium": 0, "low": 0 } },
+    "diagnostics": []
   },
   "symbols": {
     "verify_token": [
@@ -487,7 +561,12 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
         "line": 18,
         "kind": "function",
         "exported": true,
-        "doc": "Verify a JWT and return the decoded payload."
+        "doc": "Verify a JWT and return the decoded payload.",
+        "analysisMode": "ast",
+        "extractor": "python-ast",
+        "extractorVersion": "1",
+        "confidence": 0.95,
+        "schemaVersion": 1
       }
     ],
     "AuthService": [
@@ -496,15 +575,22 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
         "line": 44,
         "kind": "class",
         "exported": true,
-        "methods": ["login", "logout", "refresh"]
+        "methods": ["login", "logout", "refresh"],
+        "analysisMode": "ast",
+        "extractor": "python-ast",
+        "extractorVersion": "1",
+        "confidence": 0.95,
+        "schemaVersion": 1
       }
     ]
   },
   "file_symbols": {
     "src/auth.py": [
-      { "name": "verify_token", "line": 18, "kind": "function", "exported": true },
+      { "name": "verify_token", "line": 18, "kind": "function", "exported": true,
+        "analysisMode": "ast", "extractor": "python-ast", "confidence": 0.95 },
       { "name": "AuthService",  "line": 44, "kind": "class",    "exported": true,
-        "methods": ["login", "logout", "refresh"] }
+        "methods": ["login", "logout", "refresh"],
+        "analysisMode": "ast", "extractor": "python-ast", "confidence": 0.95 }
     ]
   }
 }
@@ -512,9 +598,11 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
 
 **Lookup patterns:**
 
-- *"Where is `verify_token` defined?"* → `symbols["verify_token"][0].file` + `.line` — O(1)
-- *"What symbols live in `src/auth.py`?"* → `file_symbols["src/auth.py"]` — O(1)
-- *"What's the blast radius of changing `verify_token`?"* → cross-reference `codeindex.json` via the file
+- _"Where is `verify_token` defined?"_ → `symbols["verify_token"][0].file` + `.line` — O(1)
+- _"What symbols live in `src/auth.py`?"_ → `file_symbols["src/auth.py"]` — O(1)
+- _"What's the blast radius of changing `verify_token`?"_ → cross-reference `codeindex.json` via the file
+
+Trust fields are documented in [docs/reference/symbolindex-schema.md](docs/reference/symbolindex-schema.md) and [docs/reference/analyzer-modes.md](docs/reference/analyzer-modes.md). Treat high-confidence `ast` or `roslyn` results as stronger navigation evidence than medium-confidence `regex` results.
 
 ---
 
@@ -522,7 +610,7 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
 
 When `--claude-md` is used, a compact section is upserted into `CLAUDE.md` bounded by HTML comment markers so re-runs update in place:
 
-```
+````markdown
 <!-- codeindex-symbols-start -->
 ## Symbol Index
 _Generated by codeindex. Update: `codeindex symbols --claude-md`_
@@ -532,7 +620,7 @@ src/auth.py: verify_token:fn:18 AuthService:cls:44[login,logout,refresh]
 src/db.py: connect:fn:12 query:fn:28 close:fn:55
 ```
 <!-- codeindex-symbols-end -->
-```
+````
 
 Format per symbol: `name:kind_abbr:line[methods...]`
 Kind abbreviations: `fn` function · `cls` class · `st` struct · `en` enum · `tr` trait · `if` interface · `ty` type · `co` const
@@ -542,7 +630,7 @@ Kind abbreviations: `fn` function · `cls` class · `st` struct · `en` enum · 
 ## AI workflow comparison
 
 | Task | Without codeindex | With symbolindex.json |
-|------|-------------------|----------------------|
+| ---- | ----------------- | --------------------- |
 | Find where `process_payment` is defined | Grep / scan ~200 files | Load 1 file, O(1) lookup |
 | Understand blast radius of a change | Manual tracing | `codeindex impact <file>` |
 | Load only relevant context | Full repo scan | File + line from symbol map |
@@ -553,10 +641,23 @@ Kind abbreviations: `fn` function · `cls` class · `st` struct · `en` enum · 
 ## Optional dependencies
 
 | Package | Purpose | Install |
-|---------|---------|---------|
+| ------- | ------- | ------- |
 | `watchdog` | `--watch` file change detection | `pip install 'codeindex[watch]'` |
 | `PyYAML` | Better Docker Compose / CI YAML parsing | `pip install 'codeindex[yaml]'` |
 | `tomli` | Rust `Cargo.toml` on Python < 3.11 | `pip install 'codeindex[toml]'` |
+
+---
+
+## Documentation
+
+| Topic | File |
+| ----- | ---- |
+| `codeindex.json` schema | [docs/reference/codeindex-schema.md](docs/reference/codeindex-schema.md) |
+| `symbolindex.json` schema | [docs/reference/symbolindex-schema.md](docs/reference/symbolindex-schema.md) |
+| Analyzer modes and confidence | [docs/reference/analyzer-modes.md](docs/reference/analyzer-modes.md) |
+| MCP tools | [docs/reference/mcp-tools.md](docs/reference/mcp-tools.md) |
+| AI agent workflows | [docs/workflows/ai-agent-workflows.md](docs/workflows/ai-agent-workflows.md) |
+| Troubleshooting | [docs/operations/troubleshooting.md](docs/operations/troubleshooting.md) |
 
 ---
 

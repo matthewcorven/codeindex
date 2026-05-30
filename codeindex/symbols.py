@@ -2,11 +2,12 @@
 from __future__ import annotations
 import json
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
+from codeindex import __version__
 from codeindex.analyzers.base import load_gitignore_patterns, is_ignored, is_skip_dir
-from codeindex.symbol_extractor import EXTRACTORS, extract_symbols
+from codeindex.symbol_extractor import EXTRACTORS, SYMBOL_SCHEMA_VERSION, extract_symbols
 
 SYMBOL_INDEX_FILENAME = "symbolindex.json"
 
@@ -14,6 +15,25 @@ _CLAUDE_START = "<!-- codeindex-symbols-start -->"
 _CLAUDE_END   = "<!-- codeindex-symbols-end -->"
 
 _SUPPORTED_EXTS = frozenset(EXTRACTORS.keys())
+
+_EXT_LANG = {
+    ".py": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".vue": "vue",
+    ".go": "go",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".rs": "rust",
+    ".php": "php",
+    ".rb": "ruby",
+    ".cs": "csharp",
+}
 
 _KIND_ABBR = {
     "function":  "fn",
@@ -42,6 +62,50 @@ def _collect_files(root: Path) -> list[Path]:
     return files
 
 
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _confidence_band(confidence: float) -> str:
+    if confidence >= 0.90:
+        return "high"
+    if confidence >= 0.70:
+        return "medium"
+    return "low"
+
+
+def _summarize_metadata(by_file: dict[str, list[dict]]) -> dict:
+    modes: dict[str, dict[str, int]] = {}
+    extractors: dict[str, int] = {}
+    bands = {"high": 0, "medium": 0, "low": 0}
+    confidence_total = 0.0
+    confidence_count = 0
+
+    for rel, symbols in by_file.items():
+        language = _EXT_LANG.get(Path(rel).suffix.lower(), "unknown")
+        language_modes = modes.setdefault(language, {})
+        for symbol in symbols:
+            mode = str(symbol.get("analysisMode", "unknown"))
+            language_modes[mode] = language_modes.get(mode, 0) + 1
+            extractor = str(symbol.get("extractor", "unknown"))
+            extractors[extractor] = extractors.get(extractor, 0) + 1
+            confidence = symbol.get("confidence")
+            if isinstance(confidence, (int, float)):
+                confidence_total += float(confidence)
+                confidence_count += 1
+                bands[_confidence_band(float(confidence))] += 1
+
+    average = round(confidence_total / confidence_count, 3) if confidence_count else None
+    return {
+        "analysisModes": modes,
+        "extractors": extractors,
+        "confidence": {
+            "average": average,
+            "bands": bands,
+        },
+    }
+
+
 def build_symbol_index(repo_path: str) -> dict:
     """Scan repo and return full symbol index dict."""
     root = Path(repo_path).resolve()
@@ -63,11 +127,19 @@ def build_symbol_index(repo_path: str) -> dict:
             entry["file"] = rel
             by_name.setdefault(sym["name"], []).append(entry)
 
+    metadata = _summarize_metadata(by_file)
+
     return {
+        "schemaVersion": SYMBOL_SCHEMA_VERSION,
         "meta": {
+            "schemaVersion": SYMBOL_SCHEMA_VERSION,
             "generated": str(date.today()),
+            "generatedAt": _utc_now(),
             "repo": root.name + "/",
             "total_symbols": total,
+            "toolVersion": __version__,
+            "diagnostics": [],
+            **metadata,
         },
         "symbols": by_name,
         "file_symbols": by_file,

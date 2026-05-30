@@ -2,12 +2,19 @@
 from __future__ import annotations
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
+from codeindex import __version__
 from codeindex.analyze import analyze
 from codeindex.impact import compute_blast_radius, enrich_nodes, enrich_links
 
 INDEX_FILENAME = "codeindex.json"
+INDEX_SCHEMA_VERSION = 1
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def build(repo_path: str, output: Path | None = None) -> dict:
@@ -19,6 +26,12 @@ def build(repo_path: str, output: Path | None = None) -> dict:
     enrich_links(data["nodes"], data["links"])
 
     # Store blast map in meta for quick lookup
+    data["schemaVersion"] = INDEX_SCHEMA_VERSION
+    data["meta"].setdefault("diagnostics", [])
+    data["meta"].setdefault("analysisModes", {})
+    data["meta"]["schemaVersion"] = INDEX_SCHEMA_VERSION
+    data["meta"]["generatedAt"] = _utc_now()
+    data["meta"]["toolVersion"] = __version__
     data["meta"]["indexed"] = True
 
     dest = output or (root / INDEX_FILENAME)

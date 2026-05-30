@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI integration tests for: lookup, dependencies, high-blast.
+CLI integration tests for: lookup, dependencies, high-blast, doctor, ci.
 
 Usage:
   python benchmark/test_cli.py [--repo PATH] [--codeindex PATH]
@@ -166,12 +166,109 @@ def test_high_blast(exe: str, repo: str, r: Results, index_path: str) -> None:
     r.check("exit non-zero for missing index", rc != 0)
 
 
+def test_doctor(exe: str, repo: str, r: Results, index_path: str, sym_path: str) -> None:
+    print("\n── doctor ──")
+
+    rc, out, err = run([
+        exe, "doctor", repo,
+        "--index", index_path,
+        "--symbol-index", sym_path,
+    ], repo)
+    r.check("exit 0 for healthy indexes", rc == 0, err.strip())
+    r.check("human output contains status", "codeindex doctor:" in out, repr(out[:200]))
+
+    rc, out, err = run([
+        exe, "doctor", repo,
+        "--index", index_path,
+        "--symbol-index", sym_path,
+        "--json",
+    ], repo)
+    r.check("--json exit 0", rc == 0, err.strip())
+    try:
+        data = json.loads(out)
+        r.check("--json ok field", data.get("ok") is True, repr(out[:200]))
+        r.check("--json checks list", isinstance(data.get("checks"), list))
+        r.check("--json summary present", isinstance(data.get("summary"), dict))
+    except json.JSONDecodeError as exc:
+        r.check("--json parses", False, str(exc))
+
+    rc, out, err = run([
+        exe, "doctor", repo,
+        "--index", "/tmp/no_such_codeindex.json",
+        "--symbol-index", sym_path,
+    ], repo)
+    r.check("exit non-zero for missing codeindex", rc != 0)
+
+
+def test_ci(exe: str, repo: str, r: Results, index_path: str, sym_path: str) -> None:
+    print("\n── ci ──")
+
+    rc, out, err = run([
+        exe, "ci", repo,
+        "--base", "HEAD",
+        "--index", index_path,
+        "--symbol-index", sym_path,
+    ], repo)
+    r.check("exit 0 for ci preflight", rc == 0, err.strip())
+    r.check("human output contains status", "codeindex ci:" in out, repr(out[:200]))
+
+    rc, out, err = run([
+        exe, "ci", repo,
+        "--base", "HEAD",
+        "--index", index_path,
+        "--symbol-index", sym_path,
+        "--json",
+    ], repo)
+    r.check("--json exit 0", rc == 0, err.strip())
+    try:
+        data = json.loads(out)
+        r.check("--json status field", data.get("status") in {"ok", "warning", "error"}, repr(out[:200]))
+        r.check("--json changes present", isinstance(data.get("changes"), dict))
+        r.check("--json blast present", isinstance(data.get("blast"), dict))
+        r.check("--json checks list", isinstance(data.get("checks"), list))
+    except json.JSONDecodeError as exc:
+        r.check("--json parses", False, str(exc))
+
+    missing_symbol_index = "/tmp/no_such_symbolindex_codeindex_tests.json"
+    rc, out, err = run([
+        exe, "ci", repo,
+        "--base", "HEAD",
+        "--index", index_path,
+        "--symbol-index", missing_symbol_index,
+        "--json",
+    ], repo)
+    r.check("non-strict warnings exit 0", rc == 0, err.strip())
+    try:
+        data = json.loads(out)
+        r.check("non-strict warnings keep ok=true", data.get("ok") is True, repr(out[:200]))
+        r.check("non-strict warnings status warning", data.get("status") == "warning", repr(out[:200]))
+    except json.JSONDecodeError as exc:
+        r.check("non-strict warning JSON parses", False, str(exc))
+
+    rc, out, err = run([
+        exe, "ci", repo,
+        "--base", "HEAD",
+        "--index", index_path,
+        "--symbol-index", missing_symbol_index,
+        "--strict",
+    ], repo)
+    r.check("strict warnings exit non-zero", rc != 0, repr(out[:200] + err[:200]))
+
+    rc, out, err = run([
+        exe, "ci", repo,
+        "--base", "HEAD",
+        "--index", "/tmp/no_such_codeindex.json",
+        "--symbol-index", sym_path,
+    ], repo)
+    r.check("exit non-zero for missing codeindex", rc != 0)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 def main() -> None:
     import argparse
-    parser = argparse.ArgumentParser(description="CLI integration tests: lookup, dependencies, high-blast")
+    parser = argparse.ArgumentParser(description="CLI integration tests: lookup, dependencies, high-blast, doctor, ci")
     parser.add_argument("--repo", default=".", help="Repo path (default: .)")
     parser.add_argument("--codeindex", default="codeindex", help="Path to codeindex executable (default: codeindex)")
     args = parser.parse_args()
@@ -218,6 +315,8 @@ def main() -> None:
     test_lookup(exe, repo, r, sym_name, expected_file)
     test_dependencies(exe, repo, r, probe_file, index_path)
     test_high_blast(exe, repo, r, index_path)
+    test_doctor(exe, repo, r, index_path, sym_path)
+    test_ci(exe, repo, r, index_path, sym_path)
 
     r.summary()
     sys.exit(0 if r.failed == 0 else 1)

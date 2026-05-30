@@ -1,0 +1,141 @@
+{
+  "files": {
+    "python/service.py": {
+      "FixturePythonService": {
+        "analysisMode": "ast",
+        "extractor": "python-ast",
+        "confidenceMin": 0.9
+      },
+      "build_fixture_python": {
+        "analysisMode": "ast",
+        "extractor": "python-ast",
+        "confidenceMin": 0.9
+      }
+    },
+    "typescript/component.ts": {
+      "FixtureTypeScriptComponent": {
+        "analysisMode": "regex",
+        "extractor": "javascript-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "renderFixtureTypeScript": {
+        "analysisMode": "regex",
+        "extractor": "javascript-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "go/service.go": {
+      "FixtureGoService": {
+        "analysisMode": "regex",
+        "extractor": "go-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "NewFixtureGoService": {
+        "analysisMode": "regex",
+        "extractor": "go-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "java/FixtureJavaService.java": {
+      "FixtureJavaService": {
+        "analysisMode": "regex",
+        "extractor": "java-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "runFixtureJava": {
+        "analysisMode": "regex",
+        "extractor": "java-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "kotlin/FixtureKotlinService.kt": {
+      "FixtureKotlinService": {
+        "analysisMode": "regex",
+        "extractor": "kotlin-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "renderFixtureKotlin": {
+        "analysisMode": "regex",
+        "extractor": "kotlin-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "rust/lib.rs": {
+      "FixtureRustService": {
+        "analysisMode": "regex",
+        "extractor": "rust-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "build_fixture_rust": {
+        "analysisMode": "regex",
+        "extractor": "rust-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "php/Service.php": {
+      "FixturePhpService": {
+        "analysisMode": "regex",
+        "extractor": "php-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "buildFixturePhp": {
+        "analysisMode": "regex",
+        "extractor": "php-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "ruby/service.rb": {
+      "FixtureRubyService": {
+        "analysisMode": "regex",
+        "extractor": "ruby-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "run_fixture_ruby": {
+        "analysisMode": "regex",
+        "extractor": "ruby-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    },
+    "csharp/Service.cs": {
+      "FixtureCSharpService": {
+        "analysisMode": "regex",
+        "extractor": "csharp-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      },
+      "RunFixtureCSharp": {
+        "analysisMode": "regex",
+        "extractor": "csharp-regex",
+        "confidenceMin": 0.7,
+        "confidenceMax": 0.89
+      }
+    }
+  },
+  "meta": {
+    "analysisModes": {
+      "csharp": {"regex": 2},
+      "go": {"regex": 2},
+      "java": {"regex": 2},
+      "kotlin": {"regex": 2},
+      "php": {"regex": 2},
+      "python": {"ast": 2},
+      "ruby": {"regex": 2},
+      "rust": {"regex": 2},
+      "typescript": {"regex": 2}
+    }
+  }
+}
