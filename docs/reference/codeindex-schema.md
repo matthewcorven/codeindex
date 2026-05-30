@@ -25,7 +25,7 @@
 | `generatedAt` | string | UTC timestamp for freshness checks. |
 | `toolVersion` | string | `codeindex` package version that generated the index. |
 | `indexed` | boolean | Indicates the index was built by `codeindex.index.build`. |
-| `analysisModes` | object | Reserved for per-language analyzer mode summaries. |
+| `analysisModes` | object | Backward-compatible per-language analyzer provenance summaries. |
 | `diagnostics` | array | Non-fatal issues discovered during analysis. |
 
 ## Nodes

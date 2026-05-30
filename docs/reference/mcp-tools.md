@@ -10,7 +10,7 @@
 | `get_impact` | Return blast-radius report for a file. | Uses the dependency index. |
 | `get_dependencies` | Return imports and imported-by for a file. | Useful before editing. |
 | `get_high_blast_files` | List risky files above a threshold. | Useful for planning and review. |
-| `build_symbol_index` | Build or refresh `symbolindex.json`. | Returns schema, analysis modes, confidence summary, and diagnostics when available. |
+| `build_symbol_index` | Build or refresh `symbolindex.json`. | Returns schema, provenance, confidence summary, and diagnostics when available. |
 | `lookup_symbol` | Find symbol definitions by exact name. | Returns provenance fields when available. |
 | `get_symbol_metadata` | Return symbol provenance and confidence only. | Use when an agent needs to decide whether a lookup is authoritative. |
 | `verify_repo_health` | Check generated index health. | Reports missing indexes, schema metadata, freshness, and diagnostics. |

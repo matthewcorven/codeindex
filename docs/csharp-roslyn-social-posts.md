@@ -1,13 +1,14 @@
 # C# / Roslyn Launch Social Drafts
 
-Draft social posts for announcing the C# / Roslyn addition after it has landed upstream. These are written as launch-ready copy assuming the Roslyn-backed implementation, fallback contract, MCP metadata, benchmarks, and docs have all shipped successfully.
+Draft social posts for announcing the C# / Roslyn addition after it has landed upstream. These are written as launch-ready copy assuming the Roslyn-backed implementation, helper runtime contract, MCP metadata, benchmarks, and docs have all shipped successfully.
 
 ## Positioning Notes
 
-- Core message: `codeindex` now gives .NET repos a compiler-backed dependency and symbol graph, not just heuristic scanning.
+- Core message: `codeindex` now gives .NET repos a compiler-backed dependency and symbol graph.
 - Audience: AI-assisted development users, .NET teams, maintainers of large C# repos, tooling builders, MCP users.
 - Contrast carefully: position this as complementary to semantic search and editor intelligence, not as a replacement for Copilot or VS Code.
-- Reusable phrases: Roslyn-backed, compiler-aware, explicit fallback, blast radius, MCP-ready, source spans, symbol graph, dependency graph, Razor/Blazor support.
+- Reusable phrases: Roslyn-backed, compiler-aware, blast radius, MCP-ready, source spans, symbol graph, dependency graph, Razor/Blazor support.
+- Prerequisite framing: C#/.NET analysis expects a usable .NET SDK and configured NuGet sources, which is normal for Roslyn-backed tooling.
 
 ## LinkedIn Posts
 
@@ -15,7 +16,7 @@ Draft social posts for announcing the C# / Roslyn addition after it has landed u
 
 `codeindex` now has Roslyn-backed C# support.
 
-That means C# dependency and symbol indexing is no longer just based on text patterns. It is compiler-aware: projects, references, packages, symbols, overloads, partial types, generated documents, source spans, and fallback metadata are all part of the index.
+That means C# dependency and symbol indexing is compiler-aware: projects, references, packages, symbols, overloads, partial types, generated documents, and source spans are all part of the index.
 
 Why this matters for AI-assisted development:
 
@@ -23,7 +24,7 @@ Why this matters for AI-assisted development:
 - Ask what depends on a file before changing it
 - Inspect direct and transitive blast radius
 - Expose the graph through CLI, JSON, reports, visualization, and MCP
-- Know whether the result came from Roslyn or from an explicit heuristic fallback
+- Give agents compiler-backed structure instead of text-only guesses
 
 Semantic search is great for finding relevant context. `codeindex` is for when you need the structural graph underneath the codebase.
 
@@ -31,11 +32,11 @@ If you work in large .NET repos and want AI tools to reason with something more 
 
 ### LinkedIn 2: Why Roslyn
 
-The big design choice in the latest `codeindex` release was simple: for C#, use Roslyn first.
+The big design choice in the latest `codeindex` release was simple: for C#, use Roslyn.
 
-Heuristics are useful. They are fast, dependency-free, and good enough for many languages. But C# has a real compiler platform, and serious .NET analysis should take advantage of it.
+C# has a real compiler platform, and serious .NET analysis should take advantage of it.
 
-With Roslyn-backed indexing, `codeindex` can understand things that regex-based scanning will always struggle with:
+With Roslyn-backed indexing, `codeindex` can understand things that text scanning struggles with:
 
 - Project references
 - Package and assembly identities
@@ -56,7 +57,7 @@ I think there are two different kinds of codebase context that AI tools need.
 
 The first is semantic retrieval: find the files and snippets that seem relevant to a question. VS Code and GitHub Copilot are very good at this.
 
-The second is structural analysis: show the actual dependency graph, symbol locations, transitive dependents, mode metadata, and blast radius.
+The second is structural analysis: show the actual dependency graph, symbol locations, transitive dependents, provenance metadata, and blast radius.
 
 The new Roslyn-backed C# support in `codeindex` is aimed at the second layer.
 
@@ -76,16 +77,12 @@ The MCP server now surfaces Roslyn-backed analysis metadata for C# repos:
 - Symbol lookup
 - Blast-radius scoring
 - Direct and transitive dependents
-- Analyzer mode used
+- Analyzer provenance
 - SDK and helper version
-- Diagnostics and fallback reason
+- Diagnostics
 - Timing information
 
-That last set matters. AI tools should not silently treat fallback output as compiler-backed truth.
-
-If Roslyn ran, the tool says so. If it could not run and `codeindex` used a heuristic fallback, the tool says that too.
-
-This gives agents something practical: not just context, but context with provenance.
+This gives agents something practical: not just context, but context with the compiler-backed provenance needed to trust it.
 
 ### LinkedIn 5: Blast Radius
 
@@ -116,11 +113,9 @@ C# was the first priority for the Roslyn-backed `codeindex` work, but Razor and 
 
 Modern .NET apps are rarely just `.cs` files. Components, `_Imports.razor`, code-behind partials, injected services, generated C# documents, and component tags all affect how a change moves through the codebase.
 
-The new release adds compiler-aware C# indexing and gated Razor/Blazor support with explicit mode metadata.
+The release adds compiler-aware C# indexing and gates Razor/Blazor support on source-span and component-resolution validation.
 
-That means `codeindex` can tell you whether Razor analysis was fully Roslyn-backed, partial, experimental, heuristic, or fallback.
-
-The goal is not to overclaim. The goal is to make the tool honest enough that developers and agents know how much to trust each result.
+The goal is not to overclaim. If Razor cannot meet the validation bar, it stays documented as future work until it can.
 
 That honesty matters in AI tooling.
 
@@ -134,7 +129,6 @@ The release gates focused on trust:
 - Precision thresholds for C# symbols
 - Razor component validation when Razor support is claimed
 - Golden snapshots
-- Explicit fallback behavior
 - SDK and helper version metadata
 - Timing reports
 - MCP contract coverage
@@ -142,9 +136,9 @@ The release gates focused on trust:
 
 This is the part of tool-building that is easy to skip and painful to retrofit.
 
-For AI-assisted development, correctness needs to be visible. A wrong graph can be worse than no graph. A fallback that looks like success can steer an agent into bad edits.
+For AI-assisted development, correctness needs to be visible. A wrong graph can be worse than no graph.
 
-So `codeindex` now treats mode truthfulness as a product feature, not an implementation detail.
+So `codeindex` treats compiler-backed validation as a product feature, not an implementation detail.
 
 ### LinkedIn 8: Maintainer Story
 
@@ -161,7 +155,7 @@ codeindex impact path/to/file.cs
 codeindex lookup SomeType
 ```
 
-Under the hood, C# analysis now uses Roslyn when available, records exactly which mode ran, and falls back only when allowed by the requested mode.
+Under the hood, C# analysis uses Roslyn and records SDK/helper provenance alongside the graph.
 
 The same data can feed humans, scripts, visualizations, CI checks, and MCP-connected AI agents.
 
@@ -177,7 +171,6 @@ For .NET repos, `codeindex` now has a much better answer.
 
 `codeindex` now has Roslyn-backed C# support.
 
-Not regex pretending to understand C#.
 Compiler-aware dependency and symbol indexing:
 
 - projects
@@ -187,7 +180,7 @@ Compiler-aware dependency and symbol indexing:
 - overloads
 - partial types
 - source spans
-- explicit fallback metadata
+- MCP metadata
 
 Built for AI-assisted dev workflows.
 
@@ -200,20 +193,17 @@ Semantic search helps agents find relevant code.
 - what depends on this file?
 - where is this symbol defined?
 - what is the blast radius?
-- was analysis Roslyn-backed or fallback?
+- what SDK/helper produced the index?
 
 For C# repos, that graph is now compiler-aware.
 
 ### X 3
 
-The new C# support in `codeindex` is Roslyn-first.
+The new C# support in `codeindex` is Roslyn-backed.
 
-Heuristics still exist, but as fallback and comparison instrumentation.
+C# has a compiler platform. The index should use it.
 
-If Roslyn runs, metadata says so.
-If fallback runs, metadata says so.
-
-No silent "trust me" mode.
+Project references, package identities, symbols, partial types, overloads, and source spans all become part of the graph.
 
 ### X 4
 
@@ -253,12 +243,7 @@ That is the shape of the code the compiler sees.
 
 The thing I care about most in this `codeindex` release: provenance.
 
-Every C# result can say what produced it:
-
-- roslyn
-- heuristic
-- heuristic-fallback
-- roslyn-partial / experimental for Razor cases
+The C# graph can record the SDK, helper version, diagnostics, and timing behind the result.
 
 AI tools should know when an answer is compiler-backed.
 
@@ -278,13 +263,9 @@ The latest `codeindex` release adds Roslyn-backed C# dependency and symbol index
 
 ### X 10
 
-The new `codeindex` C# pipeline treats fallback as a first-class product behavior.
+The new `codeindex` C# pipeline expects the normal .NET toolchain: a usable SDK and configured NuGet sources.
 
-`auto` can fall back with diagnostics.
-`roslyn` fails loudly if Roslyn is unavailable.
-`heuristic` stays explicit.
-
-Mode truthfulness matters when agents rely on the output.
+That keeps the product simple: C# support is compiler-backed, and prerequisite failures are clear.
 
 ## X Thread Drafts
 
@@ -301,7 +282,7 @@ But sometimes you need a structural answer:
 - what depends on this file?
 - where is this symbol defined?
 - what is the transitive blast radius?
-- was this result compiler-backed?
+- what produced this index?
 
 3/ That is where `codeindex` fits.
 
@@ -311,15 +292,13 @@ It builds a dependency and symbol graph that can be queried through CLI, JSON, r
 
 That means compiler-aware handling of projects, references, packages, symbols, overloads, partial types, source-generated documents, and source spans.
 
-5/ Fallback is explicit.
+5/ The runtime expectation is normal for .NET tooling: a usable SDK and configured NuGet sources.
 
-`auto` can use heuristic fallback with diagnostics.
-`roslyn` fails loudly if Roslyn is unavailable.
-`heuristic` is still available when you want dependency-free scanning.
+If prerequisites are missing, the tool reports that directly instead of producing a weaker C# graph.
 
 6/ This matters for agents.
 
-An AI tool should not silently treat a fallback parse as compiler truth. `codeindex` exposes mode, diagnostics, SDK/helper versions, fallback reason, and timing metadata.
+An AI tool should be able to ask for dependencies, blast radius, and symbol locations instead of guessing from retrieved snippets.
 
 7/ The goal is not to replace editor search or Copilot semantic search.
 
@@ -372,7 +351,7 @@ Roslyn-backed `codeindex` is a step toward that stack for .NET.
 
 Merged upstream: Roslyn-backed C# indexing in `codeindex`.
 
-Compiler-aware dependency graph. Compiler-aware symbol lookup. Explicit fallback metadata. MCP-ready.
+Compiler-aware dependency graph. Compiler-aware symbol lookup. MCP-ready.
 
 Search finds context. `codeindex` maps the structure.
 
@@ -386,11 +365,9 @@ That means better answers to the maintenance question every large repo eventuall
 
 ### Variant 3
 
-New in `codeindex`: C# analysis that can tell you not just what it found, but how it found it.
+New in `codeindex`: C# analysis backed by the compiler platform .NET teams already use.
 
-Roslyn-backed, heuristic, or fallback. With diagnostics.
-
-Mode truthfulness is a feature.
+SDK/helper provenance and diagnostics are part of the generated metadata.
 
 ### Variant 4
 

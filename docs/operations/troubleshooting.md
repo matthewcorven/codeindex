@@ -36,9 +36,9 @@ codeindex analyze <repo>
 
 Commands such as `impact`, `dependencies`, and `high-blast` need the dependency index.
 
-## C# Uses Regex Instead Of Roslyn
+## C# Symbol Output Is Not Roslyn-Backed
 
-C# symbols use `codeindex-csharp-symbols` when that executable is available on `PATH`. If it is missing, times out, returns invalid JSON, or exits nonzero, codeindex falls back to `csharp-regex` metadata.
+Current C# symbol indexing uses `codeindex-csharp-symbols` when that executable is available on `PATH`. If it is missing, times out, returns invalid JSON, or exits nonzero, current symbol entries may record legacy `csharp-regex` provenance.
 
 Check `symbolindex.json` entries for:
 
@@ -50,7 +50,7 @@ Check `symbolindex.json` entries for:
 }
 ```
 
-Fallback is useful, but it is not compiler-backed.
+That metadata is useful for understanding current symbol-index provenance, but it is not the planned C#/Razor dependency-analysis path. Planned Roslyn-backed C#/Razor support expects a usable .NET SDK and configured NuGet sources; prerequisite failures should be reported directly.
 
 ## Generated Files Dirty The Worktree
 

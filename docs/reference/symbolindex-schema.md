@@ -23,7 +23,7 @@
 | `repo` | string | Repository directory name with trailing `/`. |
 | `total_symbols` | number | Total number of symbol entries. |
 | `toolVersion` | string | `codeindex` package version that generated the index. |
-| `analysisModes` | object | Per-language counts by extraction mode. |
+| `analysisModes` | object | Per-language counts by extraction provenance. |
 | `extractors` | object | Counts by extractor implementation. |
 | `confidence` | object | Average confidence and high/medium/low band counts. |
 | `diagnostics` | array | Non-fatal issues discovered while building the index. |
@@ -41,7 +41,7 @@ Every entry keeps the legacy fields and adds provenance fields.
 | `exported` | boolean | Whether the extractor considers the symbol public/exported. |
 | `methods` | array | Optional method summary for class-like symbols. |
 | `doc` | string | Optional short documentation summary. |
-| `analysisMode` | string | `ast`, `regex`, `roslyn`, or another documented mode. |
+| `analysisMode` | string | Backward-compatible field containing provenance such as `ast`, `regex`, or `roslyn`. |
 | `extractor` | string | Extractor implementation name, such as `python-ast` or `csharp-regex`. |
 | `extractorVersion` | string | Extractor contract version. |
 | `confidence` | number | Approximate trust score from `0.0` to `1.0`. |

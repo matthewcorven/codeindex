@@ -24,7 +24,7 @@ A PR may be opened for discussion, early review, or CI visibility, but that PR i
 
 ## Continuing Plan Context
 
-The full Roslyn-first continuation prompt is tracked in `.github/prompts/roslyn-first-codeindex-plan.prompt.md`. Use it before starting the next implementation phase; it preserves the packaging, Razor scope, fallback schema, CI matrix, and validation gates that still need to be resolved.
+The phased Roslyn-first continuation prompts are tracked under `.github/prompts/`. Start with `.github/prompts/roslyn-first-codeindex-plan.prompt.md`, then load only the phase prompt for the next unit of work.
 
 Supporting context lives in:
 

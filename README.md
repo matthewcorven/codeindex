@@ -7,7 +7,7 @@ Point it at any project — Python, JavaScript/TypeScript, Go, Ruby, Rust, Java,
 - A `codeindex.json` dependency index written directly into your repo
 - Per-file blast-radius scores (how many files break if this one changes)
 - A `symbolindex.json` symbol map so AI can find any function/class without scanning every file
-- Trust metadata for symbol extraction: schema version, extractor, analysis mode, confidence, and generation time
+- Trust metadata for symbol extraction: schema version, extractor provenance, confidence, and generation time
 - Five ways to consume the data: CLI, markdown report, MCP server, pre-commit hook, CLAUDE.md injection
 - An interactive visualization UI (2D/3D graphs, dependency matrix, treemap)
 
@@ -83,9 +83,9 @@ codeindex symbols [REPO_PATH] [--output PATH] [--inline] [--index PATH]
 
 Builds a symbol index — a map of every function, class, struct, and type to its exact file and line number. Lets AI tools (and humans) find any symbol in one lookup instead of scanning the entire repo.
 
-Symbol entries include provenance metadata such as `analysisMode`, `extractor`, and `confidence`. This lets humans and agents distinguish parser/compiler-backed results from regex fallbacks, with benchmark fixtures guarding the current language confidence bands.
+Symbol entries include provenance metadata such as `analysisMode`, `extractor`, and `confidence`. This lets humans and agents distinguish parser/compiler-backed results from lexical extractors, with benchmark fixtures guarding the current language confidence bands.
 
-**Modes:**
+**Output Forms:**
 
 | Flag | Description |
 | ---- | ----------- |
@@ -483,7 +483,7 @@ codeindex impact src/auth.py
 | Ruby | `require`, `require_relative`, `autoload` | Classes, modules, methods |
 | Rust | `mod`, `use crate::` | `pub fn`, structs, enums, traits |
 | Java / Kotlin | FQN imports, wildcard imports | Classes, interfaces, methods |
-| C# | — | Roslyn-first extraction via `codeindex-csharp-symbols` (if installed), visible regex fallback for types/methods |
+| C# | Planned Roslyn-backed project, package, and symbol references | Current symbols use `codeindex-csharp-symbols` when installed; the planned C# path requires the .NET SDK and configured NuGet sources |
 | PHP | PSR-4 namespace resolution | Classes, interfaces, functions |
 | CSS / SCSS / Less | `@import`, `@use`, `@forward` | — |
 | Docker | Services, `depends_on` edges | — |
@@ -604,7 +604,7 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
 - _"What symbols live in `src/auth.py`?"_ → `file_symbols["src/auth.py"]` — O(1)
 - _"What's the blast radius of changing `verify_token`?"_ → cross-reference `codeindex.json` via the file
 
-Trust fields are documented in [docs/reference/symbolindex-schema.md](docs/reference/symbolindex-schema.md) and [docs/reference/analyzer-modes.md](docs/reference/analyzer-modes.md). Treat high-confidence `ast` or `roslyn` results as stronger navigation evidence than medium-confidence `regex` results.
+Trust fields are documented in [docs/reference/symbolindex-schema.md](docs/reference/symbolindex-schema.md) and [docs/reference/analyzer-provenance.md](docs/reference/analyzer-provenance.md). Treat high-confidence `ast` or `roslyn` results as stronger navigation evidence than medium-confidence `regex` results.
 
 ---
 
@@ -656,7 +656,7 @@ Kind abbreviations: `fn` function · `cls` class · `st` struct · `en` enum · 
 | ----- | ---- |
 | `codeindex.json` schema | [docs/reference/codeindex-schema.md](docs/reference/codeindex-schema.md) |
 | `symbolindex.json` schema | [docs/reference/symbolindex-schema.md](docs/reference/symbolindex-schema.md) |
-| Analyzer modes and confidence | [docs/reference/analyzer-modes.md](docs/reference/analyzer-modes.md) |
+| Analyzer provenance and confidence | [docs/reference/analyzer-provenance.md](docs/reference/analyzer-provenance.md) |
 | MCP tools | [docs/reference/mcp-tools.md](docs/reference/mcp-tools.md) |
 | AI agent workflows | [docs/workflows/ai-agent-workflows.md](docs/workflows/ai-agent-workflows.md) |
 | Troubleshooting | [docs/operations/troubleshooting.md](docs/operations/troubleshooting.md) |
