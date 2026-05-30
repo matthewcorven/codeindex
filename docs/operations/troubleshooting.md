@@ -24,6 +24,8 @@ codeindex ci <repo> --base origin/main
 
 Use `--strict` only after the repository has a stable threshold and the team agrees warnings should fail builds.
 
+A passing CI preflight does not make a feature-plan branch merge-ready on its own. Keep upstream merges blocked until the complete plan has been implemented, final validation has passed, and the maintainer has explicitly marked the branch ready.
+
 ## `codeindex.json` Is Missing
 
 Run:

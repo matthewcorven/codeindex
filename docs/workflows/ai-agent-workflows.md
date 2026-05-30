@@ -34,6 +34,8 @@ Teams can use codeindex outputs in CI or PR automation:
 
 Use `codeindex ci <repo> --base origin/main --json` or MCP `run_ci_check` to get a single machine-readable preflight report. Start with warnings. Make gates strict only after a repository has stable indexes and a documented threshold.
 
+For feature-plan branches, a clean CI preflight or review PR is not merge approval by itself. Keep the branch unmerged until the full plan is implemented, the final validation checklist has passed, and the maintainer explicitly marks it ready. See [Repo Intelligence Release Plan](repo-intelligence-release-plan.md).
+
 ## Prompt Pattern For Agents
 
 ```text

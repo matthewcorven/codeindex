@@ -26,6 +26,8 @@
 6. Use `verify_repo_health` before relying on cached indexes in long-running agent sessions or CI.
 7. Use `run_ci_check` before handing off a PR or proposing high-risk changes.
 
+`run_ci_check` is a preflight signal, not merge approval. Feature-plan branches should remain unmerged until their full plan is implemented and final validation is complete.
+
 ## Compatibility
 
 Tool additions are additive. Existing clients that only use the original six tools can keep operating. New fields in responses should be treated as optional by clients that do not require trust metadata.

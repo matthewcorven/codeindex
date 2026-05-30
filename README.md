@@ -312,6 +312,8 @@ codeindex ci [REPO_PATH] [--base REF] [--index PATH] [--symbol-index PATH]
 
 Runs a CI-friendly preflight: `doctor` health checks plus changed-file blast-radius warnings. By default, warnings do not fail the command. Add `--strict` when a team is ready to make stale indexes or high-blast changes block a PR.
 
+For feature-plan branches, this preflight is advisory. Do not treat a passing run, or an open PR, as upstream merge approval until the complete plan has been implemented and final validation has passed.
+
 | Flag | Default | Description |
 | ---- | ------- | ----------- |
 | `REPO_PATH` | `.` | Path to repo root |
