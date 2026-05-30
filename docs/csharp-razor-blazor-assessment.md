@@ -15,13 +15,13 @@ Strong C# and Blazor support expands codeindex into a large enterprise ecosystem
 - Surface project-reference and package-reference hotspots in multi-project .NET solutions.
 - Give teams a cheap first pass on component coupling in Blazor apps, especially shared UI libraries.
 
-The opportunity is strongest if codeindex can combine Roslyn semantic accuracy with the current zero-friction CLI experience. A fast heuristic baseline is useful for discovery; the Roslyn-hosted Razor direction is what makes the results trustworthy enough for large .NET and Blazor repositories.
+The opportunity is strongest if codeindex can combine Roslyn semantic accuracy with the current zero-friction CLI experience. A fast heuristic fallback is useful for discovery; the Roslyn-hosted Razor direction is what makes the results trustworthy enough for large .NET and Blazor repositories.
 
 ## 2026 Razor / Roslyn Update
 
 Recent Razor tooling work materially improves the opportunity. The Razor team announced that Visual Studio 2026 18.3 enables Razor cohosting: the Razor language service no longer runs as a separate external process and instead runs alongside Roslyn in the same process. Earlier design work from 2023 describes the same direction: cohost Razor and Roslyn so Razor can share Roslyn object types, services, protocol types, source-generated documents, and project-system data. A later 2026 announcement says Razor compiler and tooling code is moving into `dotnet/roslyn`, making Roslyn the source of truth for Razor development.
 
-For codeindex, that shifts the future path from “maybe call separate Razor design-time tooling” to “prefer a Roslyn/Razor cohosted LSP or Roslyn-hosted helper when it is available.” The current Python heuristic should stay because it preserves zero-dependency indexing, but the high-confidence path should query the same compiler-backed model that now owns C# and Razor editor behavior.
+For codeindex, that shifts the future path from “maybe call separate Razor design-time tooling” to “prefer a Roslyn/Razor cohosted LSP or Roslyn-hosted helper when it is available.” A Python-side heuristic fallback should stay because it preserves zero-dependency indexing, but the high-confidence path should query the same compiler-backed model that now owns C# and Razor editor behavior.
 
 ## Success Metrics
 
@@ -43,7 +43,7 @@ Razor/Blazor support should prefer the cohosted Roslyn/Razor model rather than a
 
 ## New Opportunities
 
-- Add an optional `codeindex analyze --dotnet-tooling` mode that probes for the latest GA .NET SDK and Roslyn/Razor LSP availability, then records `analysisModes.csharp` and `analysisModes.razor` as `roslyn-razor` when compiler-backed results are used.
+- Add an explicit `codeindex analyze --csharp-mode auto|roslyn|heuristic` mode that probes for the latest GA .NET SDK and Roslyn/Razor availability, then records truthful `analysisModes.csharp` and `analysisModes.razor` values when compiler-backed or fallback results are used.
 - Build a small external .NET helper instead of binding Python directly to Roslyn assemblies. The helper can absorb SDK/package churn while the Python CLI keeps its low-dependency default.
 - Use Roslyn/Razor cohosting outputs to validate the heuristic analyzer: compare component links, generated C# symbols, source spans, and project references, then report precision/recall deltas in the benchmark suite.
 - Track Razor source and issue movement in `dotnet/roslyn` first, because `dotnet/razor` is transitioning toward a legacy/servicing role.
@@ -51,9 +51,9 @@ Razor/Blazor support should prefer the cohosted Roslyn/Razor model rather than a
 
 ## Current Baseline
 
-The initial support is dependency-free and intentionally limited. It detects C#/.NET repositories, indexes `.cs`, `.csx`, `.csproj`, `.razor`, and `.cshtml` files, resolves common namespace imports, project and package references, Razor `@using`, `@inject`, component tags, and code-behind files, extracts C# type/method plus Razor component/page symbols, and marks C# and Razor analysis as heuristic in index metadata.
+The current branch support is dependency-free and intentionally limited. It adds additive schema, freshness, tool version, extractor, analysis mode, and confidence metadata to generated indexes. For C#, `codeindex symbols` can use optional `codeindex-csharp-symbols` output when available and otherwise falls back to regex extraction for `.cs` types and methods. C#/Razor dependency analysis, `.csproj`, `.razor`, and `.cshtml` indexing, and heuristic dependency-mode metadata remain intended baseline work, not current branch behavior.
 
-This baseline should be treated as a discovery and value-validation layer. It is expected to miss or over-link some advanced cases such as conditional compilation, alias-heavy code, generated Razor artifacts, source generators, MSBuild conditions, multi-targeting, and ambiguous namespace imports.
+This current foundation should be treated as the metadata and trust layer for later discovery and value validation. The intended heuristic dependency baseline is expected to miss or over-link some advanced cases such as conditional compilation, alias-heavy code, generated Razor artifacts, source generators, MSBuild conditions, multi-targeting, and ambiguous namespace imports.
 
 ## Decision Framework
 

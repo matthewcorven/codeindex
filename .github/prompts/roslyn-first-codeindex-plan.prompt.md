@@ -15,10 +15,13 @@ Repository: `/Users/core/git/matthewcorven/codeindex`
 ```bash
 python3 benchmark/test_cli.py --repo . --codeindex .venv/bin/codeindex
 python3 benchmark/test_mcp.py --repo . --codeindex .venv/bin/codeindex
-python3 benchmark/test_csharp_analyzer.py
+python3 benchmark/test_schema_metadata.py
+python3 benchmark/test_symbol_extractor.py
 ```
 
-Recent work added a dependency-free C#/Razor/Blazor heuristic baseline:
+Historical planning expected a dependency-free C#/Razor/Blazor heuristic dependency baseline. That baseline is not present on the current branch. The current branch reality is a repo-intelligence foundation: additive index metadata, health/CI tooling, and C# symbol extraction metadata with optional Roslyn output via `codeindex-csharp-symbols` plus regex fallback.
+
+The historical intended baseline files were:
 
 - `codeindex/analyzers/csharp_analyzer.py`
 - C#/Razor dispatch in `codeindex/analyze.py`
@@ -27,14 +30,15 @@ Recent work added a dependency-free C#/Razor/Blazor heuristic baseline:
 - C#/Razor fixture in `benchmark/test_csharp_analyzer.py`
 - assessment doc in `docs/csharp-razor-blazor-assessment.md`
 
-Before editing files that are part of this recent-work baseline, run `git log -- codeindex/analyze.py codeindex/analyzers/csharp_analyzer.py codeindex/symbol_extractor.py benchmark/test_csharp_analyzer.py docs/csharp-razor-blazor-assessment.md` and reconcile any newer changes before proceeding.
+Before adding or editing files that are part of this intended baseline, run `git log -- codeindex/analyze.py codeindex/symbol_extractor.py docs/csharp-razor-blazor-assessment.md` and reconcile any newer changes before proceeding. If `codeindex/analyzers/csharp_analyzer.py` or `benchmark/test_csharp_analyzer.py` still do not exist, create them only after the blocking decisions below are explicit.
 
-Current metadata marks C# and Razor as heuristic:
+Current branch metadata does not yet mark C# or Razor dependency analysis modes. C# symbol extraction can produce symbol-level metadata like:
 
 ```json
 "analysisModes": {
-  "csharp": "heuristic",
-  "razor": "heuristic"
+  "csharp": {
+    "regex": 3
+  }
 }
 ```
 
@@ -122,7 +126,7 @@ C# mode resolution:
 
 | requested_mode | Roslyn result | exit_code | csharp_actualMode | fallbackReason | stderr_required |
 |----------------|---------------|-----------|-------------------|----------------|-----------------|
-| `auto` | Roslyn succeeds within cached or first-use setup budget | 0 | `roslyn` | `null` | Selected analyzer mode and timing summary |
+| `auto` | Roslyn succeeds from cache or within `firstUseBudgetSeconds` | 0 | `roslyn` | `null` | Selected analyzer mode and timing summary |
 | `auto` | Any common helper failure | 0 | `heuristic-fallback` | Matching common helper failure reason | Selected analyzer mode and fallback reason |
 | `roslyn` | Roslyn succeeds | 0 | `roslyn` | `null` | Selected analyzer mode and timing summary |
 | `roslyn` | Any common helper failure | nonzero | none | Matching common helper failure reason | Actionable failure reason; no misleading partial Roslyn output |
@@ -225,7 +229,7 @@ These gates block release unless the action is explicitly marked `Warn`.
 
 | Gate | Measure | Threshold | Blocking action |
 |------|---------|-----------|-----------------|
-| Existing baseline | `python3 benchmark/test_csharp_analyzer.py`; `python3 benchmark/test_cli.py --repo . --codeindex .venv/bin/codeindex`; `python3 benchmark/test_mcp.py --repo . --codeindex .venv/bin/codeindex` | All pass | Fail |
+| Current foundation baseline | `python3 benchmark/test_symbol_extractor.py`; `python3 benchmark/test_schema_metadata.py`; `python3 benchmark/test_cli.py --repo . --codeindex .venv/bin/codeindex`; `python3 benchmark/test_mcp.py --repo . --codeindex .venv/bin/codeindex` | All pass | Fail |
 | Helper smoke tests | Minimal C#, multi-project C#, and Blazor fixtures emit valid JSON with nodes, links, symbols, analysis mode, SDK version, helper version, diagnostics, and timing fields | All pass | Fail |
 | Required Roslyn mode | `codeindex analyze <fixture> --csharp-mode roslyn` succeeds with supported SDK/tooling and fails actionably when unavailable | 100% | Fail |
 | Auto mode | `codeindex analyze <fixture>` uses Roslyn only when available from cache or within `firstUseBudgetSeconds` and records truthful C#/Razor modes | 100% | Fail |
@@ -260,7 +264,7 @@ High-level measures:
 
 3. Decision success: `codeindex impact`, `codeindex dependencies`, `codeindex lookup`, and MCP tools all surface enough mode/confidence metadata for users and AI agents to decide whether a result is authoritative or approximate.
 
-4. Adoption success: default `auto` mode selects Roslyn for .NET repos only when supported tooling is available and helper setup is cached or completes within the first-use setup budget, while keeping non-.NET repos and minimal Python installs frictionless.
+4. Adoption success: default `auto` mode selects Roslyn for .NET repos only when supported tooling is available and helper setup is cached or completes within `firstUseBudgetSeconds`, while keeping non-.NET repos and minimal Python installs frictionless.
 
 5. Outcome success: Roslyn-backed mode materially outperforms heuristic mode on complex fixtures: partial types, aliases, generics, extension methods, project references, generated code, Razor component tags, `_Imports.razor`, code-behind, and mapped Razor source spans.
 
