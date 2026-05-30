@@ -1,0 +1,27 @@
+@typeparam TItem where TItem : IWidget
+@inject ILogger<WidgetCard<TItem>> Logger
+
+<article class="widget-card @(Selected?.Id == Item.Id ? "selected" : null)">
+    <header>
+        @HeaderTemplate?.Invoke(Item)
+    </header>
+
+    <section @onclick="SelectAsync">
+        @ChildContent
+    </section>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public TItem Item { get; set; } = default!;
+    [Parameter] public TItem? Selected { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment<TItem>? HeaderTemplate { get; set; }
+    [Parameter] public EventCallback<TItem> OnSelect { get; set; }
+    [CascadingParameter] public Dashboard<TItem>? Owner { get; set; }
+
+    private async Task SelectAsync()
+    {
+        Logger.LogInformation("Selected {WidgetId}", Item.Id);
+        await OnSelect.InvokeAsync(Item);
+    }
+}

@@ -18,6 +18,10 @@ _DOTNET_GLOBS = {
     "razor": ("*.razor", "*.cshtml"),
 }
 
+DEFERRED_DOTNET_ACTUAL_MODES = {
+    "razor": "deferred",
+}
+
 
 def detect_dotnet_languages(root: Path) -> list[str]:
     found: list[str] = []
@@ -139,6 +143,13 @@ def requested_modes_for_languages(languages: list[str]) -> dict[str, str]:
 
 def _mode_diagnostic(language: str, actual_mode: str) -> str:
     label = "C#" if language == "csharp" else "Razor"
+    if language == "razor" and actual_mode == "deferred":
+        return (
+            "Razor/Blazor Roslyn support is deferred after the Phase 4 spike. "
+            "codeindex detects Razor files for runtime metadata, but it does not currently index Razor "
+            "components, generated C# documents, component tags, _Imports.razor, @using, @inject, "
+            "code-behind partials, or mapped Razor source spans."
+        )
     return (
         f"{label} defaults to Roslyn mode, but actual mode is currently {actual_mode}. "
         "Truthful fallback metadata is preserved when compiler-backed analysis is unavailable or falls back. "
@@ -161,15 +172,17 @@ def build_analysis_runtime(
     diagnostics: list[str] = []
 
     for language, requested_mode in requested_modes.items():
-        actual_mode = actual_modes.get(language, "unavailable")
+        actual_mode = actual_modes.get(language, DEFERRED_DOTNET_ACTUAL_MODES.get(language, "unavailable"))
         item_diagnostics = list(runtime.get("diagnostics", []))
         if actual_mode != requested_mode:
             item_diagnostics.append(_mode_diagnostic(language, actual_mode))
+        analyzer = "none" if actual_mode == "deferred" else "roslyn"
+        provenance = "phase-4-razor-deferred" if actual_mode == "deferred" else "roslyn-runtime-contract"
         detail[language] = {
             "requestedMode": requested_mode,
             "actualMode": actual_mode,
-            "analyzer": "roslyn",
-            "provenance": "roslyn-runtime-contract",
+            "analyzer": analyzer,
+            "provenance": provenance,
             "diagnostics": item_diagnostics,
             "helperProtocolVersion": HELPER_PROTOCOL_VERSION,
             "helperCachePath": helper_cache_path(runtime.get("dotnetSdkVersion")),
@@ -184,5 +197,8 @@ def build_analysis_runtime(
         diagnostics.extend(item_diagnostics)
 
     deduped = list(dict.fromkeys(diagnostics))
-    actual = {language: actual_modes.get(language, "unavailable") for language in requested_modes}
+    actual = {
+        language: actual_modes.get(language, DEFERRED_DOTNET_ACTUAL_MODES.get(language, "unavailable"))
+        for language in requested_modes
+    }
     return requested_modes, actual, detail, deduped

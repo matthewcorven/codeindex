@@ -25,7 +25,7 @@
 | `toolVersion` | string | `codeindex` package version that generated the index. |
 | `analysisModes` | object | Per-language counts by extraction provenance. |
 | `requestedModes` | object | Requested runtime modes for languages with an explicit Phase 1 contract, currently C#/Razor defaulting to `roslyn`. |
-| `actualModes` | object | Actual runtime modes observed for languages with an explicit Phase 1 contract. |
+| `actualModes` | object | Actual runtime modes observed for languages with an explicit Phase 1 contract. Razor may report `deferred` until component symbol extraction and source mapping are implemented. |
 | `analysisRuntime` | object | Additive runtime details such as analyzer, provenance, `dotnetPath`, `dotnetSdkVersion`, `helperProtocolVersion`, `helperCachePath`, timing budget, and diagnostics. |
 | `extractors` | object | Counts by extractor implementation. |
 | `confidence` | object | Average confidence and high/medium/low band counts. |

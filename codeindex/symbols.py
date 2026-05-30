@@ -123,7 +123,7 @@ def _actual_dotnet_symbol_modes(by_file: dict[str, list[dict]], dotnet_languages
         if csharp_modes:
             actual_modes["csharp"] = sorted(csharp_modes)[0]
     if "razor" in dotnet_languages:
-        actual_modes.setdefault("razor", "unavailable")
+        actual_modes.setdefault("razor", "deferred")
     return actual_modes
 
 

@@ -112,4 +112,4 @@ The Phase 3 helper covers:
 - internal links by file path and external links by package or assembly identity
 - classes, structs, interfaces, enums, delegates, methods, properties, events, containing types, signatures, accessibility, and source spans
 
-Razor remains limited to runtime-contract metadata until later work lands.
+Razor remains limited to runtime-contract metadata until later work lands. The Phase 4 Razor/Blazor spike set the initial Razor support level to `deferred`, not `roslyn`, `roslyn-partial`, `roslyn-experimental`, `heuristic`, or `heuristic-fallback`. For `.razor` and `.cshtml` repositories, metadata records `requestedModes.razor = "roslyn"`, `actualModes.razor = "deferred"`, `analysisRuntime.razor.analyzer = "none"`, and `analysisRuntime.razor.provenance = "phase-4-razor-deferred"`. The helper does not emit Razor nodes, links, symbols, component-resolution claims, generated C# document claims, or mapped Razor source spans.

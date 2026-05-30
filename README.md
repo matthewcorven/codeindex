@@ -74,7 +74,7 @@ Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ lang
 | `--watch` | off | Re-index on file changes (requires `watchdog`) |
 | `--first-use-budget-seconds` | `60` | Record the first-use Roslyn helper setup budget for C#/Razor runtime metadata |
 
-For repos that contain C# or Razor files, runtime metadata records the requested Roslyn mode, the observed actual mode, and actionable .NET SDK / NuGet prerequisites. C# analysis now uses the source-built Roslyn helper by default for dependency and symbol extraction, while fallback metadata stays truthful when helper-backed analysis is unavailable.
+For repos that contain C# or Razor files, runtime metadata records the requested Roslyn mode, the observed actual mode, and actionable .NET SDK / NuGet prerequisites. C# analysis now uses the source-built Roslyn helper by default for dependency and symbol extraction, while fallback metadata stays truthful when helper-backed analysis is unavailable. Razor and Blazor files are detected for runtime metadata, but Phase 4 keeps their actual mode at `deferred`; codeindex does not currently claim Razor component links, generated C# documents, component tags, `_Imports.razor`, `@using`, `@inject`, code-behind partials as Razor components, or mapped Razor source spans.
 
 ---
 
@@ -111,7 +111,7 @@ Both `--inline` and `--claude-md` can be combined in a single run.
 | `--all-symbols` | off | Include non-exported symbols in CLAUDE.md (default: exported only) |
 | `--first-use-budget-seconds` | `60` | Record the first-use Roslyn helper setup budget for C#/Razor runtime metadata |
 
-For C#, `codeindex symbols` now prefers Roslyn-backed symbol extraction by default. If Roslyn prerequisites or helper execution fail, the symbol extractor falls back to regex output and carries the helper diagnostics forward in the emitted symbol metadata so requested and actual modes remain truthful.
+For C#, `codeindex symbols` now prefers Roslyn-backed symbol extraction by default. If Roslyn prerequisites or helper execution fail, the symbol extractor falls back to regex output and carries the helper diagnostics forward in the emitted symbol metadata so requested and actual modes remain truthful. Razor and Blazor symbol extraction is deferred; `.razor` and `.cshtml` files contribute runtime metadata only, not symbols.
 
 The helper contract and cache/build behavior are documented in [docs/reference/roslyn-helper-contract.md](docs/reference/roslyn-helper-contract.md).
 

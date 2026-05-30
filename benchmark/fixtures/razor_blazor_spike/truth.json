@@ -1,0 +1,27 @@
+{
+  "supportLevel": "deferred",
+  "precisionGateApplies": false,
+  "reason": "Phase 4 allows Microsoft.AspNetCore.Razor.Language only; the current helper does not use a dependable source-mapped Razor component model.",
+  "unsupportedScopes": [
+    "razor components",
+    "generated C# documents",
+    "component tags",
+    "_Imports.razor",
+    "@using",
+    "@inject",
+    "code-behind partials as Razor components",
+    "mapped Razor source spans"
+  ],
+  "razorFiles": [
+    "_Imports.razor",
+    "Pages/Dashboard.razor",
+    "Components/WidgetCard.razor"
+  ],
+  "componentTags": [
+    "WidgetCard",
+    "CascadingValue",
+    "EditForm",
+    "Virtualize",
+    "PageTitle"
+  ]
+}

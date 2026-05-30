@@ -1,0 +1,99 @@
+@page "/dashboard/{AccountId:int}"
+@rendermode InteractiveServer
+@using System.Linq.Expressions
+@typeparam TItem where TItem : IWidget
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject IWidgetService WidgetService
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Dashboard @AccountId</PageTitle>
+
+<CascadingValue Value="this">
+    <EditForm Model="Filter" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <InputText @bind-Value="Filter.Query" />
+        <button type="submit" disabled="@IsBusy">Save</button>
+    </EditForm>
+
+    @if (IsBusy)
+    {
+        <p role="status">Loading</p>
+    }
+    else if (Items.Count == 0)
+    {
+        <p>No widgets</p>
+    }
+    else
+    {
+        <Virtualize ItemsProvider="LoadWidgetsAsync" Context="widget">
+            <ItemContent>
+                <WidgetCard TItem="TItem"
+                            Item="widget"
+                            Selected="Selected"
+                            @key="widget.Id"
+                            @ref="_card"
+                            OnSelect="HandleSelectAsync">
+                    <HeaderTemplate Context="header">
+                        <strong>@header.Title</strong>
+                    </HeaderTemplate>
+                    <ChildContent>
+                        @foreach (var tag in widget.Tags)
+                        {
+                            <span class="tag">@tag</span>
+                        }
+                    </ChildContent>
+                </WidgetCard>
+            </ItemContent>
+            <Placeholder>
+                <p>Loading row</p>
+            </Placeholder>
+        </Virtualize>
+    }
+
+    @switch (Selected?.Status)
+    {
+        case WidgetStatus.Ready:
+            <button @onclick="() => Navigation.NavigateTo($\"/widgets/{Selected.Id}\")">Open</button>
+            break;
+        case WidgetStatus.Blocked:
+            <p class="blocked">Blocked</p>
+            break;
+        default:
+            <p>Select a widget</p>
+            break;
+    }
+</CascadingValue>
+
+@code {
+    [Parameter] public int AccountId { get; set; }
+    [CascadingParameter] public Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private WidgetCard<TItem>? _card;
+    private WidgetFilter Filter { get; } = new();
+    private List<TItem> Items { get; } = new();
+    private TItem? Selected { get; set; }
+    private bool IsBusy { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Items.Clear();
+        Items.AddRange(await WidgetService.GetWidgetsAsync<TItem>(AccountId, Filter.Query));
+    }
+
+    private async ValueTask<ItemsProviderResult<TItem>> LoadWidgetsAsync(ItemsProviderRequest request)
+    {
+        var page = await WidgetService.GetPageAsync<TItem>(AccountId, request.StartIndex, request.Count);
+        return new ItemsProviderResult<TItem>(page.Items, page.Total);
+    }
+
+    private Task HandleSelectAsync(TItem item)
+    {
+        Selected = item;
+        return Task.CompletedTask;
+    }
+
+    private Task SaveAsync() => WidgetService.SaveFilterAsync(AccountId, Filter);
+
+    public void Dispose() => _card?.Dispose();
+}

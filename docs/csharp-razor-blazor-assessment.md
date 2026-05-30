@@ -23,6 +23,16 @@ Recent Razor tooling work materially improves the opportunity. The Razor team an
 
 For codeindex, that shifts the future path from “maybe call separate Razor design-time tooling” to “prefer a Roslyn/Razor cohosted LSP or Roslyn-hosted helper.” The C#/Razor path should query the same compiler-backed model that now owns C# and Razor editor behavior.
 
+## Phase 4 Razor / Blazor Spike Result
+
+Initial Razor/Blazor support level is `deferred`.
+
+The Phase 4 spike stayed inside the Phase 0 API boundary: `Microsoft.AspNetCore.Razor.Language` is allowed, while `Microsoft.CodeAnalysis.Razor.*`, `Microsoft.VisualStudio.*`, Visual Studio-only hosting APIs, and APIs that cannot run from a standalone helper process remain out of scope. Under that constraint, the current helper does not have a dependable way to combine generated Razor C# documents, component tag resolution, `_Imports.razor`, `@using`, `@inject`, code-behind partials, and mapped source spans into the same compiler-backed dependency model used for C#.
+
+Because source mapping and component resolution are not yet dependable enough for the Phase 4 validation gate, codeindex does not ship Razor as `roslyn`, `roslyn-partial`, `roslyn-experimental`, `heuristic`, or `heuristic-fallback`. Repositories with `.razor` or `.cshtml` files are detected and record `requestedModes.razor = "roslyn"` and `actualModes.razor = "deferred"`; `analysisRuntime.razor` uses `analyzer = "none"` and `provenance = "phase-4-razor-deferred"` with diagnostics listing the unsupported scopes. No Razor component precision claim is made, and no Razor source spans are emitted.
+
+The Razor/Blazor spike fixture in `benchmark/fixtures/razor_blazor_spike/` intentionally exercises directives and syntax that future work must resolve: `_Imports.razor`, `@page`, `@rendermode`, `@using`, `@typeparam`, `@implements`, `@inject`, `@attribute`, component tags, templated components, `RenderFragment`, `EventCallback`, `@key`, `@ref`, `@foreach`, `@switch`, cascading parameters, and a `.razor.cs` code-behind partial. The current tests validate only the deferred support contract: mode truthfulness, absence of Razor nodes/links/symbols/source spans, and preservation of existing C# source-span behavior.
+
 ## Success Metrics
 
 | Metric | Target | Why it matters |
@@ -53,7 +63,7 @@ Razor/Blazor support should prefer the cohosted Roslyn/Razor model rather than a
 
 ## Current Baseline
 
-The current branch support is dependency-free and intentionally limited. It adds additive schema, freshness, tool version, extractor, analysis mode, and confidence metadata to generated indexes. For C#, `codeindex symbols` can use optional `codeindex-csharp-symbols` output when available and otherwise records legacy regex provenance for `.cs` types and methods. C#/Razor dependency analysis, `.csproj`, `.razor`, and `.cshtml` indexing remain planned Roslyn-backed work, not current branch behavior.
+The current branch support is intentionally limited. It adds additive schema, freshness, tool version, extractor, analysis mode, and confidence metadata to generated indexes. C# dependency and symbol analysis can use the source-built Roslyn helper. Razor/Blazor dependency analysis, `.razor`, and `.cshtml` indexing remain planned Roslyn-backed work, not current branch behavior; Phase 4 records the actual Razor mode as `deferred`.
 
 This current foundation should be treated as the metadata and trust layer for later discovery and value validation. Roslyn-backed implementation is expected to cover advanced cases such as conditional compilation, alias-heavy code, generated Razor artifacts, source generators, MSBuild conditions, multi-targeting, and ambiguous namespace imports better than text scanning can.
 
