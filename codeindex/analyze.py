@@ -6,7 +6,7 @@ from pathlib import Path
 from codeindex.analyzers import (
     python_analyzer, js_analyzer, css_analyzer, go_analyzer,
     ruby_analyzer, rust_analyzer, java_analyzer, php_analyzer,
-    docker_analyzer, ci_analyzer, schema_analyzer,
+    csharp_analyzer, docker_analyzer, ci_analyzer, schema_analyzer,
 )
 from codeindex.analyzers.cross_lang_analyzer import find_api_boundaries
 from codeindex.analyzers.monorepo_analyzer import detect_workspaces, assign_packages
@@ -41,6 +41,8 @@ def detect_languages(root: Path) -> list:
         langs.append("rust")
     if _any_match(root, ["*.java", "*.kt", "*.kts"]):
         langs.append("java")
+    if _any_match(root, ["*.cs", "*.csx", "*.razor", "*.cshtml", "*.csproj"]):
+        langs.append("csharp")
     if (root / "composer.json").exists() or _any_match(root, ["*.php"]):
         langs.append("php")
     compose_names = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]
@@ -60,8 +62,8 @@ def merge_links(target: dict, source: dict) -> None:
 
 
 _INFRA_TYPES   = {"service", "pipeline", "database"}
-_FRONTEND_LANGS = {"javascript", "typescript", "vue", "css", "scss", "less", "sass"}
-_BACKEND_LANGS  = {"python", "go", "ruby", "rust", "java", "kotlin", "php"}
+_FRONTEND_LANGS = {"javascript", "typescript", "vue", "css", "scss", "less", "sass", "razor"}
+_BACKEND_LANGS  = {"python", "go", "ruby", "rust", "java", "kotlin", "php", "csharp"}
 _INFRA_LANGS    = {"docker", "github-actions", "gitlab-ci", "sql", "prisma"}
 
 _ANALYZERS = {
@@ -72,6 +74,7 @@ _ANALYZERS = {
     "ruby":       ruby_analyzer,
     "rust":       rust_analyzer,
     "java":       java_analyzer,
+    "csharp":     csharp_analyzer,
     "php":        php_analyzer,
     "docker":     docker_analyzer,
     "ci":         ci_analyzer,
@@ -133,6 +136,8 @@ def analyze(root_path: str) -> dict:
         for key in ("framework", "packageManager"):
             if meta.get(key):
                 meta_extra.setdefault(key, meta[key])
+        if meta.get("analysisModes"):
+            meta_extra.setdefault("analysisModes", {}).update(meta["analysisModes"])
 
     for lang in langs:
         analyzer = _ANALYZERS.get(lang)

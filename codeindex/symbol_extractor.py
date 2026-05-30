@@ -282,6 +282,91 @@ def extract_php(path: Path) -> list[dict]:
     return symbols
 
 
+# ── C# / Razor ───────────────────────────────────────────────────────────────
+
+_CS_TYPE = re.compile(
+    r"^\s*(?:\[[^\]]+\]\s*)*"
+    r"(?P<mods>(?:(?:public|internal|private|protected|abstract|sealed|static|partial|file|readonly|unsafe)\s+)*)"
+    r"(?P<kind>class|interface|struct|enum|record(?:\s+(?:class|struct))?)\s+(?P<name>[A-Za-z_]\w*)",
+    re.MULTILINE,
+)
+_CS_METHOD = re.compile(
+    r"^\s*(?:\[[^\]]+\]\s*)*"
+    r"(?P<mods>(?:(?:public|internal|private|protected|static|virtual|override|async|sealed|abstract|extern|partial|unsafe|new)\s+)+)"
+    r"(?:[A-Za-z_]\w*(?:[.<>,\[\]?]\w*)*\s+)+(?P<name>[A-Za-z_]\w*)\s*\(",
+    re.MULTILINE,
+)
+_RAZOR_CODE_METHOD = re.compile(
+    r"^\s*(?:(?:public|private|protected|internal|async|override|static)\s+)+"
+    r"(?:[A-Za-z_]\w*(?:[.<>,\[\]?]\w*)*\s+)+([A-Za-z_]\w*)\s*\(",
+    re.MULTILINE,
+)
+_CS_NOISE = {"if", "for", "foreach", "while", "switch", "catch", "using", "lock"}
+
+
+def extract_csharp(path: Path) -> list[dict]:
+    try:
+        source = path.read_text(errors="replace")
+    except OSError:
+        return []
+
+    symbols = []
+    seen: set[str] = set()
+
+    for match in _CS_TYPE.finditer(source):
+        name = match.group("name")
+        mods = match.group("mods") or ""
+        kind = match.group("kind").split()[0]
+        if name and name not in seen:
+            seen.add(name)
+            symbols.append({
+                "name": name,
+                "line": _line_of(source, match.start()),
+                "kind": "class" if kind == "record" else kind,
+                "exported": "private" not in mods,
+            })
+
+    for match in _CS_METHOD.finditer(source):
+        name = match.group("name")
+        mods = match.group("mods") or ""
+        if name and name not in seen and name not in _CS_NOISE:
+            seen.add(name)
+            symbols.append({
+                "name": name,
+                "line": _line_of(source, match.start()),
+                "kind": "function",
+                "exported": "private" not in mods,
+            })
+
+    return symbols
+
+
+def extract_razor(path: Path) -> list[dict]:
+    try:
+        source = path.read_text(errors="replace")
+    except OSError:
+        return []
+
+    symbols = [{
+        "name": path.stem,
+        "line": 1,
+        "kind": "component" if path.suffix.lower() == ".razor" else "page",
+        "exported": True,
+    }]
+    seen = {path.stem}
+    for match in _RAZOR_CODE_METHOD.finditer(source):
+        name = match.group(1)
+        if name and name not in seen and name not in _CS_NOISE:
+            seen.add(name)
+            symbols.append({
+                "name": name,
+                "line": _line_of(source, match.start()),
+                "kind": "function",
+                "exported": True,
+            })
+    return symbols
+
+
 # ── Ruby ─────────────────────────────────────────────────────────────────────
 
 _RUBY_CLASS  = re.compile(r"^class\s+([A-Z]\w*)",           re.MULTILINE)
@@ -332,6 +417,10 @@ EXTRACTORS: dict[str, callable] = {
     ".java": extract_java,
     ".kt":   extract_java,
     ".kts":  extract_java,
+    ".cs":   extract_csharp,
+    ".csx":  extract_csharp,
+    ".razor": extract_razor,
+    ".cshtml": extract_razor,
     ".rs":   extract_rust,
     ".php":  extract_php,
     ".rb":   extract_ruby,

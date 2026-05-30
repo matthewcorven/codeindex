@@ -80,7 +80,8 @@ def _start_watcher(repo_path: str) -> None:
 
     WATCHED_EXTS = {
         ".py", ".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs",
-        ".rb", ".go", ".rs", ".java", ".kt", ".php",
+        ".rb", ".go", ".rs", ".java", ".kt", ".cs", ".csx",
+        ".razor", ".cshtml", ".csproj", ".php",
         ".yml", ".yaml", ".sql", ".prisma",
     }
 

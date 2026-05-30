@@ -23,7 +23,8 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
 
         WATCHED_EXTS = {
             ".py", ".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs",
-            ".rb", ".go", ".rs", ".java", ".kt", ".php",
+            ".rb", ".go", ".rs", ".java", ".kt", ".cs", ".csx",
+            ".razor", ".cshtml", ".csproj", ".php",
             ".yml", ".yaml", ".sql", ".prisma",
         }
         dest = output or (Path(repo).resolve() / "codeindex.json")

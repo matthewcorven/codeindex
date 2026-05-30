@@ -57,7 +57,7 @@ open http://localhost:8080
 codeindex analyze [REPO_PATH] [--output PATH] [--watch]
 ```
 
-Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ languages automatically.
+Analyzes the repo and writes `codeindex.json` to the repo root. Detects 13+ languages automatically.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -421,11 +421,14 @@ codeindex impact src/auth.py
 | Ruby | `require`, `require_relative`, `autoload` | Classes, modules, methods |
 | Rust | `mod`, `use crate::` | `pub fn`, structs, enums, traits |
 | Java / Kotlin | FQN imports, wildcard imports | Classes, interfaces, methods |
+| C# / Razor / Blazor | `using`, `ProjectReference`, `PackageReference`, Razor `@using` / `@inject`, component tags, code-behind links | Types, methods, components, pages |
 | PHP | PSR-4 namespace resolution | Classes, interfaces, functions |
 | CSS / SCSS / Less | `@import`, `@use`, `@forward` | — |
 | Docker | Services, `depends_on` edges | — |
 | CI/CD | GitHub Actions + GitLab CI jobs, `needs:` edges | — |
 | SQL / Prisma | Tables/models, foreign key edges | — |
+
+C# / Razor / Blazor support currently ships as a dependency-free baseline. The Roslyn/Razor cohosting opportunity, success criteria, and value assessment are tracked in [docs/csharp-razor-blazor-assessment.md](docs/csharp-razor-blazor-assessment.md).
 
 ---
 

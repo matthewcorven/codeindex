@@ -25,6 +25,8 @@ _KIND_ABBR = {
     "type":      "ty",
     "const":     "co",
     "module":    "mod",
+    "component": "cmp",
+    "page":      "pg",
 }
 
 

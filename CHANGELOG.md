@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### C# / Razor / Blazor
+
+- Dependency and symbol indexing baseline for C#, Razor, and Blazor files.
+- C# / Razor / Blazor opportunity assessment with Roslyn/Razor cohosting success metrics.
+- Integration fixture for C# using directives, Razor component links, code-behind links, and symbols.
+
 ## [0.2.0] - 2026-05-24
 
 ### Added
