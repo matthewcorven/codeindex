@@ -34,7 +34,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
 
             def _rebuild(self):
                 print("[watch] change detected, re-indexing…", file=sys.stderr)
-                build(repo, dest)
+                build(repo, dest, first_use_budget_seconds=args.first_use_budget_seconds)
 
             def on_modified(self, event):
                 if event.is_directory:
@@ -45,7 +45,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
                     self._timer = threading.Timer(1.0, self._rebuild)
                     self._timer.start()
 
-        build(repo, dest)
+        build(repo, dest, first_use_budget_seconds=args.first_use_budget_seconds)
         observer = Observer()
         observer.schedule(_Watcher(), repo, recursive=True)
         observer.start()
@@ -58,7 +58,7 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
             observer.stop()
         observer.join()
     else:
-        build(repo, output)
+        build(repo, output, first_use_budget_seconds=args.first_use_budget_seconds)
 
 
 def _cmd_impact(args: argparse.Namespace) -> None:
@@ -145,7 +145,10 @@ def _cmd_symbols(args: argparse.Namespace) -> None:
     from codeindex.index import find_index, INDEX_FILENAME
 
     repo = Path(args.repo).resolve()
-    symbol_data = build_symbol_index(str(repo))
+    symbol_data = build_symbol_index(
+        str(repo),
+        first_use_budget_seconds=args.first_use_budget_seconds,
+    )
 
     if args.inline:
         if args.index:
@@ -307,10 +310,23 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     # ── analyze ────────────────────────────────────────────────────────────
-    p_analyze = sub.add_parser("analyze", help="Analyze a repo and write codeindex.json")
+    p_analyze = sub.add_parser(
+        "analyze",
+        help="Analyze a repo and write codeindex.json",
+        description=(
+            "Analyze a repo and write codeindex.json. C#/Razor runtime metadata defaults to Roslyn mode "
+            "and expects a supported .NET SDK plus NuGet restore access when helper-backed analysis lands."
+        ),
+    )
     p_analyze.add_argument("repo", nargs="?", default=".", help="Path to repo root (default: .)")
     p_analyze.add_argument("--output", help="Output path (default: <repo>/codeindex.json)")
     p_analyze.add_argument("--watch", action="store_true", help="Re-index on file changes")
+    p_analyze.add_argument(
+        "--first-use-budget-seconds",
+        type=float,
+        default=60.0,
+        help="Budget to record for first Roslyn helper setup on C#/Razor repos (default: 60)",
+    )
 
     # ── impact ─────────────────────────────────────────────────────────────
     p_impact = sub.add_parser("impact", help="Show blast-radius impact for a file")
@@ -330,7 +346,14 @@ def _build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("--output", help="codeindex.json path override (viz mode)")
 
     # ── symbols ────────────────────────────────────────────────────────────────
-    p_sym = sub.add_parser("symbols", help="Build a symbol index (functions, classes, exports)")
+    p_sym = sub.add_parser(
+        "symbols",
+        help="Build a symbol index (functions, classes, exports)",
+        description=(
+            "Build a symbol index. C# symbol output still records truthful regex-or-Roslyn provenance while the "
+            "Roslyn helper boundary is phased in; future helper setup requires a supported .NET SDK and NuGet access."
+        ),
+    )
     p_sym.add_argument("repo", nargs="?", default=".", help="Path to repo root (default: .)")
     p_sym.add_argument(
         "--output", help="Output path for symbolindex.json (default: <repo>/symbolindex.json)"
@@ -354,6 +377,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_sym.add_argument(
         "--all-symbols", dest="all_symbols", action="store_true",
         help="Include non-exported symbols in --claude-md output (default: exported only)",
+    )
+    p_sym.add_argument(
+        "--first-use-budget-seconds",
+        type=float,
+        default=60.0,
+        help="Budget to record for first Roslyn helper setup on C#/Razor repos (default: 60)",
     )
 
     # ── lookup ─────────────────────────────────────────────────────────────

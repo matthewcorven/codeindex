@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import os
 from pathlib import Path
 from unittest.mock import patch
 
+from codeindex.analyzers.csharp_analyzer_roslyn import RoslynHelperResult
 from codeindex.symbol_extractor import extract_csharp, extract_symbols
 
 
@@ -50,6 +52,26 @@ internal class InternalOnly {}
         self.assertEqual(symbols[0]["name"], "FromRoslyn")
         self.assert_metadata(symbols[0], "roslyn", "codeindex-csharp-symbols")
         self.assertGreater(symbols[0]["confidence"], 0.9)
+
+    def test_csharp_regex_fallback_includes_helper_diagnostics_when_enabled(self) -> None:
+        src = "public class PublicService { public int Run() => 1; }"
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "service.cs"
+            path.write_text(src)
+            helper_result = RoslynHelperResult(
+                symbols=None,
+                diagnostics=["Roslyn helper restore failed. Cache path: /tmp/cache. boom"],
+            )
+            with patch.dict(os.environ, {"CODEINDEX_ENABLE_CSHARP_HELPER": "1"}, clear=False):
+                with patch("codeindex.symbol_extractor.extract_csharp_symbols_with_helper", return_value=helper_result):
+                    symbols = extract_csharp(path)
+
+        by_name = {s["name"]: s for s in symbols}
+        self.assert_metadata(by_name["PublicService"], "regex", "csharp-regex")
+        self.assertEqual(
+            by_name["PublicService"].get("diagnostics"),
+            ["Roslyn helper restore failed. Cache path: /tmp/cache. boom"],
+        )
 
     def test_python_ast_symbols_include_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as td:

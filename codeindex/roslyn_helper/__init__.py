@@ -1,0 +1,1 @@
+"""Source-built Roslyn helper assets shipped with the Python package."""

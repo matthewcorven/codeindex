@@ -20,6 +20,10 @@ TOOLS = [
                 "repo_path": {
                     "type": "string",
                     "description": "Absolute or relative path to the repo root.",
+                },
+                "first_use_budget_seconds": {
+                    "type": "number",
+                    "description": "Recorded first-use Roslyn helper setup budget for C#/Razor repos. Requires a supported .NET SDK and NuGet restore access when helper-backed analysis is enabled.",
                 }
             },
             "required": ["repo_path"],
@@ -202,7 +206,8 @@ TOOLS = [
         "description": (
             "Build or refresh the symbol index (symbolindex.json) for a repository. "
             "Extracts every function, class, struct, and type with file and line number. "
-            "Run once after cloning or after major refactors, then use lookup_symbol."
+            "Run once after cloning or after major refactors, then use lookup_symbol. "
+            "C#/Razor runtime metadata records Roslyn prerequisites, while current C# symbol extraction may still report regex provenance until the helper boundary lands."
         ),
         "inputSchema": {
             "type": "object",
@@ -210,6 +215,10 @@ TOOLS = [
                 "repo_path": {
                     "type": "string",
                     "description": "Absolute or relative path to the repo root.",
+                },
+                "first_use_budget_seconds": {
+                    "type": "number",
+                    "description": "Recorded first-use Roslyn helper setup budget for C#/Razor repos. Requires a supported .NET SDK and NuGet restore access when helper-backed analysis is enabled.",
                 },
             },
             "required": ["repo_path"],
@@ -244,12 +253,16 @@ def _resolve_file_id(file_path: str, data: dict) -> str | None:
 
 def _call_analyze_repo(params: dict) -> dict:
     repo_path = params["repo_path"]
-    data = build(repo_path)
+    data = build(repo_path, first_use_budget_seconds=float(params.get("first_use_budget_seconds", 60.0)))
     return {
         "success": True,
         "files":   data["meta"]["total_files"],
         "loc":     data["meta"]["total_loc"],
         "languages": data["meta"].get("languages", []),
+        "requestedModes": data["meta"].get("requestedModes", {}),
+        "actualModes": data["meta"].get("actualModes", {}),
+        "analysisRuntime": data["meta"].get("analysisRuntime", {}),
+        "diagnostics": data["meta"].get("diagnostics", []),
     }
 
 
@@ -385,7 +398,7 @@ def _call_get_symbol_metadata(params: dict) -> dict:
 def _call_build_symbol_index(params: dict) -> dict:
     from codeindex.symbols import build_symbol_index as _build, write_standalone  # noqa: PLC0415
     repo_path = params["repo_path"]
-    symbol_data = _build(repo_path)
+    symbol_data = _build(repo_path, first_use_budget_seconds=float(params.get("first_use_budget_seconds", 60.0)))
     out = Path(repo_path) / SYMBOL_INDEX_FILENAME
     write_standalone(symbol_data, out)
     return {
@@ -395,6 +408,9 @@ def _call_build_symbol_index(params: dict) -> dict:
         "output":        str(out),
         "schemaVersion": symbol_data.get("schemaVersion"),
         "analysisModes": symbol_data["meta"].get("analysisModes", {}),
+        "requestedModes": symbol_data["meta"].get("requestedModes", {}),
+        "actualModes": symbol_data["meta"].get("actualModes", {}),
+        "analysisRuntime": symbol_data["meta"].get("analysisRuntime", {}),
         "confidence":    symbol_data["meta"].get("confidence", {}),
         "diagnostics":   symbol_data["meta"].get("diagnostics", []),
     }

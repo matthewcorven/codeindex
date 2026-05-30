@@ -7,6 +7,11 @@ from pathlib import Path
 
 from codeindex import __version__
 from codeindex.analyzers.base import load_gitignore_patterns, is_ignored, is_skip_dir
+from codeindex.runtime_contract import (
+    DEFAULT_FIRST_USE_BUDGET_SECONDS,
+    build_analysis_runtime,
+    detect_dotnet_languages,
+)
 from codeindex.symbol_extractor import EXTRACTORS, SYMBOL_SCHEMA_VERSION, extract_symbols
 
 SYMBOL_INDEX_FILENAME = "symbolindex.json"
@@ -106,7 +111,27 @@ def _summarize_metadata(by_file: dict[str, list[dict]]) -> dict:
     }
 
 
-def build_symbol_index(repo_path: str) -> dict:
+def _actual_dotnet_symbol_modes(by_file: dict[str, list[dict]], dotnet_languages: list[str]) -> dict[str, str]:
+    actual_modes: dict[str, str] = {}
+    if "csharp" in dotnet_languages:
+        csharp_modes = {
+            str(symbol.get("analysisMode", "unknown"))
+            for rel, symbols in by_file.items()
+            if Path(rel).suffix.lower() == ".cs"
+            for symbol in symbols
+        }
+        if csharp_modes:
+            actual_modes["csharp"] = sorted(csharp_modes)[0]
+    if "razor" in dotnet_languages:
+        actual_modes.setdefault("razor", "unavailable")
+    return actual_modes
+
+
+def build_symbol_index(
+    repo_path: str,
+    *,
+    first_use_budget_seconds: float = DEFAULT_FIRST_USE_BUDGET_SECONDS,
+) -> dict:
     """Scan repo and return full symbol index dict."""
     root = Path(repo_path).resolve()
     files = _collect_files(root)
@@ -128,6 +153,12 @@ def build_symbol_index(repo_path: str) -> dict:
             by_name.setdefault(sym["name"], []).append(entry)
 
     metadata = _summarize_metadata(by_file)
+    dotnet_languages = detect_dotnet_languages(root)
+    requested_modes, actual_modes, analysis_runtime, diagnostics = build_analysis_runtime(
+        dotnet_languages,
+        _actual_dotnet_symbol_modes(by_file, dotnet_languages),
+        first_use_budget_seconds=first_use_budget_seconds,
+    )
 
     return {
         "schemaVersion": SYMBOL_SCHEMA_VERSION,
@@ -138,7 +169,10 @@ def build_symbol_index(repo_path: str) -> dict:
             "repo": root.name + "/",
             "total_symbols": total,
             "toolVersion": __version__,
-            "diagnostics": [],
+            "diagnostics": diagnostics,
+            "requestedModes": requested_modes,
+            "actualModes": actual_modes,
+            "analysisRuntime": analysis_runtime,
             **metadata,
         },
         "symbols": by_name,

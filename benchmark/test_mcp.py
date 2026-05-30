@@ -154,6 +154,9 @@ def test_analyze_repo(client: MCPClient, r: Results, repo: str) -> None:
     r.check("success=true", data.get("success") is True)
     r.check("files count > 0", data.get("files", 0) > 0, str(data))
     r.check("languages present", isinstance(data.get("languages"), list))
+    r.check("requestedModes present", isinstance(data.get("requestedModes"), dict), str(data))
+    r.check("actualModes present", isinstance(data.get("actualModes"), dict), str(data))
+    r.check("analysisRuntime present", isinstance(data.get("analysisRuntime"), dict), str(data))
 
 
 def test_get_impact(client: MCPClient, r: Results, file: str) -> None:
@@ -211,6 +214,9 @@ def test_build_symbol_index(client: MCPClient, r: Results, repo: str) -> None:
     r.check("total_symbols > 0", data.get("total_symbols", 0) > 0, str(data))
     r.check("files > 0", data.get("files", 0) > 0)
     r.check("output path present", "output" in data)
+    r.check("requestedModes present", isinstance(data.get("requestedModes"), dict), str(data))
+    r.check("actualModes present", isinstance(data.get("actualModes"), dict), str(data))
+    r.check("analysisRuntime present", isinstance(data.get("analysisRuntime"), dict), str(data))
 
 
 def test_lookup_symbol(client: MCPClient, r: Results, symbols: list[tuple[str, str, int]]) -> None:

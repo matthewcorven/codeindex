@@ -10,6 +10,11 @@ from codeindex.analyzers import (
 )
 from codeindex.analyzers.cross_lang_analyzer import find_api_boundaries
 from codeindex.analyzers.monorepo_analyzer import detect_workspaces, assign_packages
+from codeindex.runtime_contract import (
+    DEFAULT_FIRST_USE_BUDGET_SECONDS,
+    build_analysis_runtime,
+    detect_dotnet_languages,
+)
 
 _SKIP = {
     "__pycache__", ".venv", "venv", "env", ".git",
@@ -51,6 +56,9 @@ def detect_languages(root: Path) -> list:
         langs.append("ci")
     if _any_match(root, ["*.sql", "*.prisma"]):
         langs.append("schema")
+    for language in detect_dotnet_languages(root):
+        if language not in langs:
+            langs.append(language)
     return langs
 
 
@@ -103,7 +111,7 @@ def link_kind(s_type: str, t_type: str) -> str:
     return "imports"
 
 
-def analyze(root_path: str) -> dict:
+def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_USE_BUDGET_SECONDS) -> dict:
     root = Path(root_path).resolve()
     if not root.exists():
         raise FileNotFoundError(f"Path not found: {root}")
@@ -111,6 +119,12 @@ def analyze(root_path: str) -> dict:
     langs = detect_languages(root)
     if not langs:
         print(f"Warning: no supported languages detected in {root}", file=sys.stderr)
+
+    requested_modes, actual_modes, analysis_runtime, runtime_diagnostics = build_analysis_runtime(
+        langs,
+        {},
+        first_use_budget_seconds=first_use_budget_seconds,
+    )
 
     group_map   = {}
     all_nodes   = []
@@ -178,6 +192,10 @@ def analyze(root_path: str) -> dict:
             "total_files": total_files,
             "total_loc":   total_loc,
             "languages":   langs,
+            "requestedModes": requested_modes,
+            "actualModes": actual_modes,
+            "analysisRuntime": analysis_runtime,
+            "diagnostics": runtime_diagnostics,
             **meta_extra,
         },
         "nodes": all_nodes,

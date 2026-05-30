@@ -24,3 +24,4 @@ include = ["codeindex*"]
 
 [tool.setuptools.package-data]
 "codeindex" = ["py.typed"]
+"codeindex.roslyn_helper" = ["*.csproj", "*.cs"]

@@ -2,11 +2,12 @@
 from __future__ import annotations
 import ast
 import json
+import os
 import re
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Callable
+
+from codeindex.analyzers.csharp_analyzer_roslyn import extract_csharp_symbols_with_helper
 
 SYMBOL_SCHEMA_VERSION = 1
 EXTRACTOR_VERSION = "1"
@@ -363,56 +364,45 @@ _CSHARP_METHOD = re.compile(
 )
 _CSHARP_NOISE = {"if", "for", "while", "switch", "foreach", "catch", "lock", "using", "return"}
 
+_LAST_CSHARP_HELPER_DIAGNOSTICS: dict[str, list[str]] = {}
+
+
+def _remember_csharp_helper_diagnostics(path: Path, diagnostics: list[str]) -> None:
+    key = str(path)
+    if diagnostics:
+        _LAST_CSHARP_HELPER_DIAGNOSTICS[key] = diagnostics
+    else:
+        _LAST_CSHARP_HELPER_DIAGNOSTICS.pop(key, None)
+
+
+def _consume_csharp_helper_diagnostics(path: Path) -> list[str]:
+    return _LAST_CSHARP_HELPER_DIAGNOSTICS.pop(str(path), [])
+
+
+def _csharp_helper_enabled() -> bool:
+    return os.environ.get("CODEINDEX_ENABLE_CSHARP_HELPER", "").strip().lower() in {"1", "true", "yes", "on"}
+
 
 def _extract_csharp_roslyn(path: Path) -> list[dict] | None:
-    tool = shutil.which("codeindex-csharp-symbols")
-    if not tool:
+    if not _csharp_helper_enabled():
+        _remember_csharp_helper_diagnostics(path, [])
         return None
-    try:
-        result = subprocess.run(
-            [tool, str(path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if result.returncode != 0 or not result.stdout.strip():
-        return None
-    try:
-        parsed = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(parsed, list):
-        return None
-    symbols: list[dict] = []
-    for item in parsed:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        line = item.get("line")
-        kind = item.get("kind", "class")
-        if not isinstance(name, str) or not isinstance(line, int):
-            continue
-        symbol = {
-            "name": name,
-            "line": line,
-            "kind": str(kind),
-            "exported": bool(item.get("exported", True)),
-        }
-        if isinstance(item.get("methods"), list):
-            symbol["methods"] = [m for m in item["methods"] if isinstance(m, str)]
-        if isinstance(item.get("doc"), str) and item["doc"]:
-            symbol["doc"] = item["doc"][:80]
-        symbols.append(symbol)
-    return symbols
+    result = extract_csharp_symbols_with_helper(path)
+    _remember_csharp_helper_diagnostics(path, result.diagnostics)
+    return result.symbols
 
 
 def extract_csharp(path: Path) -> list[dict]:
     roslyn_symbols = _extract_csharp_roslyn(path)
+    helper_diagnostics = _consume_csharp_helper_diagnostics(path)
     if roslyn_symbols is not None:
-        return _with_symbol_metadata(roslyn_symbols, "roslyn", "codeindex-csharp-symbols", 0.98)
+        return _with_symbol_metadata(
+            roslyn_symbols,
+            "roslyn",
+            "codeindex-csharp-symbols",
+            0.98,
+            diagnostics=helper_diagnostics or None,
+        )
     try:
         source = path.read_text(errors="replace")
     except OSError:
@@ -449,7 +439,13 @@ def extract_csharp(path: Path) -> list[dict]:
             "exported": "public" in mods.split(),
         })
 
-    return _with_symbol_metadata(symbols, "regex", "csharp-regex", 0.70)
+    return _with_symbol_metadata(
+        symbols,
+        "regex",
+        "csharp-regex",
+        0.70,
+        diagnostics=helper_diagnostics or None,
+    )
 
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────

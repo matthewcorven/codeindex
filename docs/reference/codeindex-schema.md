@@ -26,6 +26,9 @@
 | `toolVersion` | string | `codeindex` package version that generated the index. |
 | `indexed` | boolean | Indicates the index was built by `codeindex.index.build`. |
 | `analysisModes` | object | Backward-compatible per-language analyzer provenance summaries. |
+| `requestedModes` | object | Requested runtime modes for languages with an explicit Phase 1 contract, currently C#/Razor defaulting to `roslyn`. |
+| `actualModes` | object | Actual runtime modes observed for languages with an explicit Phase 1 contract. |
+| `analysisRuntime` | object | Additive runtime details such as analyzer, provenance, `dotnetPath`, `dotnetSdkVersion`, `helperProtocolVersion`, `helperCachePath`, timing budget, and diagnostics. |
 | `diagnostics` | array | Non-fatal issues discovered during analysis. |
 
 ## Nodes

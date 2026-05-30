@@ -8,6 +8,7 @@ Point it at any project — Python, JavaScript/TypeScript, Go, Ruby, Rust, Java,
 - Per-file blast-radius scores (how many files break if this one changes)
 - A `symbolindex.json` symbol map so AI can find any function/class without scanning every file
 - Trust metadata for symbol extraction: schema version, extractor provenance, confidence, and generation time
+- Phase 2 Roslyn helper boundary for C#/Razor: requested mode, actual mode, SDK/helper contract details, actionable diagnostics, and a source-built helper adapter ready for smoke validation
 - Five ways to consume the data: CLI, markdown report, MCP server, pre-commit hook, CLAUDE.md injection
 - An interactive visualization UI (2D/3D graphs, dependency matrix, treemap)
 
@@ -61,7 +62,7 @@ open http://localhost:8080
 ### `codeindex analyze`
 
 ```bash
-codeindex analyze [REPO_PATH] [--output PATH] [--watch]
+codeindex analyze [REPO_PATH] [--output PATH] [--watch] [--first-use-budget-seconds N]
 ```
 
 Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ languages automatically.
@@ -71,6 +72,9 @@ Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ lang
 | `REPO_PATH` | `.` | Path to repo root |
 | `--output` | `<repo>/codeindex.json` | Override output path |
 | `--watch` | off | Re-index on file changes (requires `watchdog`) |
+| `--first-use-budget-seconds` | `60` | Record the first-use Roslyn helper setup budget for C#/Razor runtime metadata |
+
+For repos that contain C# or Razor files, Phase 2 metadata records a requested Roslyn mode, the currently observed actual mode, and actionable .NET SDK / NuGet prerequisites. The shipped helper boundary is source-built and smoke-testable, while deep dependency semantics land in later phases.
 
 ---
 
@@ -79,6 +83,7 @@ Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ lang
 ```bash
 codeindex symbols [REPO_PATH] [--output PATH] [--inline] [--index PATH]
                   [--claude-md] [--claude-md-path PATH] [--all-symbols]
+                  [--first-use-budget-seconds N]
 ```
 
 Builds a symbol index — a map of every function, class, struct, and type to its exact file and line number. Lets AI tools (and humans) find any symbol in one lookup instead of scanning the entire repo.
@@ -104,6 +109,11 @@ Both `--inline` and `--claude-md` can be combined in a single run.
 | `--index` | auto-discovered | Path to `codeindex.json` (for `--inline`) |
 | `--claude-md-path` | `<repo>/CLAUDE.md` | Override CLAUDE.md path |
 | `--all-symbols` | off | Include non-exported symbols in CLAUDE.md (default: exported only) |
+| `--first-use-budget-seconds` | `60` | Record the first-use Roslyn helper setup budget for C#/Razor runtime metadata |
+
+Current Phase 2 behavior keeps the legacy C# regex symbol extractor as an explicitly documented symbol-index detail until the Roslyn helper boundary replaces it. Set `CODEINDEX_ENABLE_CSHARP_HELPER=1` when you want symbol extraction to exercise the helper boundary during smoke validation; otherwise symbol output remains on the deterministic regex path while metadata still distinguishes requested Roslyn mode from the observed actual mode.
+
+The helper contract and cache/build behavior are documented in [docs/reference/roslyn-helper-contract.md](docs/reference/roslyn-helper-contract.md).
 
 **Examples:**
 

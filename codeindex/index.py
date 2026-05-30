@@ -8,6 +8,7 @@ from pathlib import Path
 from codeindex import __version__
 from codeindex.analyze import analyze
 from codeindex.impact import compute_blast_radius, enrich_nodes, enrich_links
+from codeindex.runtime_contract import DEFAULT_FIRST_USE_BUDGET_SECONDS
 
 INDEX_FILENAME = "codeindex.json"
 INDEX_SCHEMA_VERSION = 1
@@ -17,9 +18,14 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def build(repo_path: str, output: Path | None = None) -> dict:
+def build(
+    repo_path: str,
+    output: Path | None = None,
+    *,
+    first_use_budget_seconds: float = DEFAULT_FIRST_USE_BUDGET_SECONDS,
+) -> dict:
     root = Path(repo_path).resolve()
-    data = analyze(str(root))
+    data = analyze(str(root), first_use_budget_seconds=first_use_budget_seconds)
 
     blast = compute_blast_radius(data["nodes"], data["links"])
     enrich_nodes(data["nodes"], blast)
@@ -29,6 +35,9 @@ def build(repo_path: str, output: Path | None = None) -> dict:
     data["schemaVersion"] = INDEX_SCHEMA_VERSION
     data["meta"].setdefault("diagnostics", [])
     data["meta"].setdefault("analysisModes", {})
+    data["meta"].setdefault("requestedModes", {})
+    data["meta"].setdefault("actualModes", {})
+    data["meta"].setdefault("analysisRuntime", {})
     data["meta"]["schemaVersion"] = INDEX_SCHEMA_VERSION
     data["meta"]["generatedAt"] = _utc_now()
     data["meta"]["toolVersion"] = __version__
