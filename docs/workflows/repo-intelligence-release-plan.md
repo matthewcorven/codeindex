@@ -22,6 +22,15 @@ A PR may be opened for discussion, early review, or CI visibility, but that PR i
 - Add repo health and CI preflight surfaces through CLI and MCP tools.
 - Add documentation and fixture-backed regression coverage for the metadata contract.
 
+## Continuing Plan Context
+
+The full Roslyn-first continuation prompt is tracked in `.github/prompts/roslyn-first-codeindex-plan.prompt.md`. Use it before starting the next implementation phase; it preserves the packaging, Razor scope, fallback schema, CI matrix, and validation gates that still need to be resolved.
+
+Supporting context lives in:
+
+- `docs/csharp-razor-blazor-assessment.md`
+- `docs/csharp-roslyn-social-posts.md`
+
 ## Validation Checklist
 
 Run these before considering a final merge-ready PR:
