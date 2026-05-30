@@ -15,9 +15,13 @@ The initial Roslyn helper will be source-built. The helper source will ship with
 
 Helper setup uses normal `dotnet restore` and `dotnet build` through the user's configured NuGet sources. Accessible NuGet dependencies are a reasonable prerequisite for Roslyn-backed .NET support. codeindex will not download opaque helper binaries outside the .NET SDK/NuGet toolchain.
 
+Offline helper setup is supported only when the local machine already has a compatible SDK, NuGet package cache, and configured sources sufficient for `dotnet restore --locked-mode` or the equivalent implementation restore. A cold first use without network or package cache access should fail with the restore diagnostics and the cache path that would have been used. A warm cache may run offline if the helper fingerprint still matches and no restore/build is required.
+
 ### SDK And Version Compatibility
 
 The first helper target is the latest generally available .NET SDK train at implementation time, currently .NET 10 SDK. The helper should target `net10.0` unless implementation evidence shows that a lower target framework can provide the same Roslyn and Razor APIs without additional compatibility shims.
+
+The helper requires an SDK, not just a runtime, because first-use setup restores and builds the helper. Select the newest installed supported SDK feature band by default. If a repository `global.json` pins an unsupported SDK, report that as an actionable prerequisite failure for C#/Razor analysis rather than silently switching to a different SDK for that repository.
 
 The helper protocol version is coupled to the `codeindex` package version. A Python package release may invoke only the helper source and protocol schema shipped in that same package. Future helper protocol changes must be additive or must invalidate the helper cache by changing the protocol version.
 
@@ -39,7 +43,12 @@ Invalidate the cache when any of these inputs change:
 - selected .NET SDK feature band
 - operating system or runtime identifier when the build output is not portable
 
-Warm cached helper analysis should target under 5 seconds for tiny repositories. First restore/build time is measured separately and may exceed warm analysis time because it is normal .NET setup work.
+First-use setup has two separately reported budgets:
+
+- Restore/build budget: best effort target under 60 seconds for tiny repositories on a normal developer machine with warm NuGet caches, but this is explicitly outside warm analysis timing because network and NuGet source performance dominate cold setup.
+- Warm analysis budget: target under 5 seconds for tiny repositories once the helper is already built and the cache fingerprint is valid.
+
+If first-use setup exceeds its budget, the implementation should surface timing diagnostics but not treat the budget miss alone as a correctness failure unless a timeout is reached.
 
 ### `dotnet` Discovery And Validation
 
@@ -49,7 +58,7 @@ Discover `dotnet` in this order:
 2. `PATH` lookup using the platform equivalent of `shutil.which("dotnet")`.
 3. Conservative platform defaults, including `/usr/local/share/dotnet/dotnet`, `/usr/local/bin/dotnet`, `/opt/homebrew/bin/dotnet`, and `%ProgramFiles%\dotnet\dotnet.exe`.
 
-Validation must execute the discovered binary directly, not through shell aliases. The implementation should use `dotnet --list-sdks` and `dotnet --info` to confirm that a supported SDK is installed and to record SDK diagnostics.
+Validation must execute the discovered binary directly, not through shell aliases. The implementation should use `dotnet --list-sdks` and `dotnet --info` to confirm that a supported SDK is installed and to record SDK diagnostics. The selected SDK version and SDK root are part of helper setup diagnostics and cache identity.
 
 Missing `dotnet`, unsupported SDKs, restore failures, build failures, helper timeouts, nonzero helper exits, and invalid helper JSON are actionable command failures for C#/Razor analysis.
 
@@ -97,6 +106,12 @@ Preserve existing metadata fields and add Roslyn runtime detail without replacin
 - `timings`
 
 The implementation should not add public analyzer selector flags for C#/Razor. Roslyn is the C#/Razor runtime path; helper prerequisite failures are reported as failures.
+
+### Fallback Behavior
+
+For shipped C#/Razor dependency analysis, there is no regex or text-scanning fallback when Roslyn setup fails. The command should fail actionably and preserve diagnostics so users can fix SDK, restore, build, timeout, or helper output problems.
+
+Existing dependency-light indexing for non-.NET languages remains unchanged. The current legacy C# symbol extractor may continue to report regex provenance for symbol-only output until replaced, but it must not be presented as the Roslyn-backed C#/Razor dependency analyzer.
 
 ## Phase 1 Gate
 
