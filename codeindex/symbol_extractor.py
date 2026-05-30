@@ -380,7 +380,13 @@ def _consume_csharp_helper_diagnostics(path: Path) -> list[str]:
 
 
 def _csharp_helper_enabled() -> bool:
-    return os.environ.get("CODEINDEX_ENABLE_CSHARP_HELPER", "").strip().lower() in {"1", "true", "yes", "on"}
+    disable = os.environ.get("CODEINDEX_DISABLE_CSHARP_HELPER", "").strip().lower()
+    if disable in {"1", "true", "yes", "on"}:
+        return False
+    enable = os.environ.get("CODEINDEX_ENABLE_CSHARP_HELPER", "").strip().lower()
+    if enable in {"0", "false", "no", "off"}:
+        return False
+    return True
 
 
 def _extract_csharp_roslyn(path: Path) -> list[dict] | None:

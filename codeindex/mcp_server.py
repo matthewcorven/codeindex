@@ -207,7 +207,7 @@ TOOLS = [
             "Build or refresh the symbol index (symbolindex.json) for a repository. "
             "Extracts every function, class, struct, and type with file and line number. "
             "Run once after cloning or after major refactors, then use lookup_symbol. "
-            "C#/Razor runtime metadata records Roslyn prerequisites, while current C# symbol extraction may still report regex provenance until the helper boundary lands."
+            "C#/Razor runtime metadata records Roslyn prerequisites. C# symbol extraction prefers Roslyn and falls back to regex with truthful diagnostics when helper-backed analysis is unavailable."
         ),
         "inputSchema": {
             "type": "object",

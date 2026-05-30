@@ -58,7 +58,11 @@ def _cmd_analyze(args: argparse.Namespace) -> None:
             observer.stop()
         observer.join()
     else:
-        build(repo, output, first_use_budget_seconds=args.first_use_budget_seconds)
+        try:
+            build(repo, output, first_use_budget_seconds=args.first_use_budget_seconds)
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            sys.exit(1)
 
 
 def _cmd_impact(args: argparse.Namespace) -> None:
@@ -314,8 +318,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "analyze",
         help="Analyze a repo and write codeindex.json",
         description=(
-            "Analyze a repo and write codeindex.json. C#/Razor runtime metadata defaults to Roslyn mode "
-            "and expects a supported .NET SDK plus NuGet restore access when helper-backed analysis lands."
+            "Analyze a repo and write codeindex.json. C# dependency analysis defaults to Roslyn mode and "
+            "requires a supported .NET SDK plus NuGet restore access for compiler-backed analysis."
         ),
     )
     p_analyze.add_argument("repo", nargs="?", default=".", help="Path to repo root (default: .)")
@@ -350,8 +354,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "symbols",
         help="Build a symbol index (functions, classes, exports)",
         description=(
-            "Build a symbol index. C# symbol output still records truthful regex-or-Roslyn provenance while the "
-            "Roslyn helper boundary is phased in; future helper setup requires a supported .NET SDK and NuGet access."
+            "Build a symbol index. C# symbol extraction prefers Roslyn by default and falls back to regex with "
+            "truthful diagnostics when helper-backed analysis is unavailable."
         ),
     )
     p_sym.add_argument("repo", nargs="?", default=".", help="Path to repo root (default: .)")

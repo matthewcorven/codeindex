@@ -84,6 +84,7 @@ _ANALYZERS = {
     "docker":     docker_analyzer,
     "ci":         ci_analyzer,
     "schema":     schema_analyzer,
+    "csharp":     __import__("codeindex.analyzers.csharp_analyzer_roslyn", fromlist=["analyze"]),
 }
 
 
@@ -120,19 +121,16 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
     if not langs:
         print(f"Warning: no supported languages detected in {root}", file=sys.stderr)
 
-    requested_modes, actual_modes, analysis_runtime, runtime_diagnostics = build_analysis_runtime(
-        langs,
-        {},
-        first_use_budget_seconds=first_use_budget_seconds,
-    )
-
     group_map   = {}
     all_nodes   = []
     all_links   = {}
+    raw_links   = []
     ext_seen    = set()
     total_files = 0
     total_loc   = 0
     meta_extra  = {}
+    actual_modes = {}
+    analyzer_diagnostics: list[str] = []
 
     def add_results(nodes, ext_nodes, links_map, meta):
         nonlocal total_files, total_loc
@@ -142,8 +140,11 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
                 all_nodes.append(en)
                 ext_seen.add(en["id"])
         merge_links(all_links, links_map)
+        raw_links.extend(meta.get("linkRecords", []))
         total_files += meta.get("total_files", 0)
         total_loc   += meta.get("total_loc", 0)
+        actual_modes.update(meta.get("actualModes", {}))
+        analyzer_diagnostics.extend(meta.get("diagnostics", []))
         for key in ("framework", "packageManager"):
             if meta.get(key):
                 meta_extra.setdefault(key, meta[key])
@@ -154,7 +155,15 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
             try:
                 add_results(*analyzer.analyze(root, group_map))
             except Exception as e:
+                if lang == "csharp":
+                    raise RuntimeError(f"C# Roslyn analysis failed: {e}") from e
                 print(f"Warning: {lang} analyzer failed: {e}", file=sys.stderr)
+
+    requested_modes, actual_modes, analysis_runtime, runtime_diagnostics = build_analysis_runtime(
+        langs,
+        actual_modes,
+        first_use_budget_seconds=first_use_budget_seconds,
+    )
 
     for node in all_nodes:
         node.setdefault("layer", assign_layer(node))
@@ -177,6 +186,13 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
         }
         for (s, t), w in all_links.items()
     ]
+    for link in raw_links:
+        enriched = dict(link)
+        enriched.setdefault(
+            "kind",
+            link_kind(node_type_map.get(enriched.get("source", ""), "module"), node_type_map.get(enriched.get("target", ""), "module")),
+        )
+        links.append(enriched)
 
     try:
         api_links = find_api_boundaries(root, all_nodes)
@@ -195,7 +211,7 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
             "requestedModes": requested_modes,
             "actualModes": actual_modes,
             "analysisRuntime": analysis_runtime,
-            "diagnostics": runtime_diagnostics,
+            "diagnostics": list(dict.fromkeys([*runtime_diagnostics, *analyzer_diagnostics])),
             **meta_extra,
         },
         "nodes": all_nodes,

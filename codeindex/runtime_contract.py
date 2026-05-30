@@ -1,4 +1,4 @@
-"""Phase 1 Roslyn runtime contract helpers."""
+"""Roslyn runtime contract helpers."""
 from __future__ import annotations
 
 import os
@@ -141,8 +141,8 @@ def _mode_diagnostic(language: str, actual_mode: str) -> str:
     label = "C#" if language == "csharp" else "Razor"
     return (
         f"{label} defaults to Roslyn mode, but actual mode is currently {actual_mode}. "
-        "Phase 1 only exposes the runtime contract and truthful metadata; helper setup and deep analyzer semantics "
-        "land in later phases. Install a supported .NET 10 SDK and keep NuGet restore access available."
+        "Truthful fallback metadata is preserved when compiler-backed analysis is unavailable or falls back. "
+        "Install a supported .NET 10 SDK and keep NuGet restore access available."
     )
 
 
@@ -169,7 +169,7 @@ def build_analysis_runtime(
             "requestedMode": requested_mode,
             "actualMode": actual_mode,
             "analyzer": "roslyn",
-            "provenance": "phase-1-contract",
+            "provenance": "roslyn-runtime-contract",
             "diagnostics": item_diagnostics,
             "helperProtocolVersion": HELPER_PROTOCOL_VERSION,
             "helperCachePath": helper_cache_path(runtime.get("dotnetSdkVersion")),

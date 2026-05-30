@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,7 +31,8 @@ internal class InternalOnly {}
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "service.cs"
             path.write_text(src)
-            symbols = extract_symbols(path)
+            with patch("codeindex.symbol_extractor._extract_csharp_roslyn", return_value=None):
+                symbols = extract_symbols(path)
 
         by_name = {s["name"]: s for s in symbols}
         self.assertEqual(by_name["PublicService"]["kind"], "class")
@@ -53,7 +53,7 @@ internal class InternalOnly {}
         self.assert_metadata(symbols[0], "roslyn", "codeindex-csharp-symbols")
         self.assertGreater(symbols[0]["confidence"], 0.9)
 
-    def test_csharp_regex_fallback_includes_helper_diagnostics_when_enabled(self) -> None:
+    def test_csharp_regex_fallback_includes_helper_diagnostics_by_default(self) -> None:
         src = "public class PublicService { public int Run() => 1; }"
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "service.cs"
@@ -62,9 +62,8 @@ internal class InternalOnly {}
                 symbols=None,
                 diagnostics=["Roslyn helper restore failed. Cache path: /tmp/cache. boom"],
             )
-            with patch.dict(os.environ, {"CODEINDEX_ENABLE_CSHARP_HELPER": "1"}, clear=False):
-                with patch("codeindex.symbol_extractor.extract_csharp_symbols_with_helper", return_value=helper_result):
-                    symbols = extract_csharp(path)
+            with patch("codeindex.symbol_extractor.extract_csharp_symbols_with_helper", return_value=helper_result):
+                symbols = extract_csharp(path)
 
         by_name = {s["name"]: s for s in symbols}
         self.assert_metadata(by_name["PublicService"], "regex", "csharp-regex")
