@@ -89,7 +89,7 @@ TOOLS = [
     {
         "name": "lookup_symbol",
         "description": (
-            "Find where a function, class, struct, or other symbol is defined. "
+            "Find where an indexed function, class, struct, or other symbol is defined. "
             "Returns file path, line number, and any available provenance metadata via O(1) index lookup — no file scanning. "
             "Requires symbolindex.json (run build_symbol_index first)."
         ),
@@ -205,7 +205,7 @@ TOOLS = [
         "name": "build_symbol_index",
         "description": (
             "Build or refresh the symbol index (symbolindex.json) for a repository. "
-            "Extracts every function, class, struct, and type with file and line number. "
+            "Extracts supported functions, classes, structs, and types with file and line number. "
             "Run once after cloning or after major refactors, then use lookup_symbol. "
             "C#/Razor runtime metadata records Roslyn prerequisites. C# symbol extraction prefers Roslyn and falls back to regex with truthful diagnostics when helper-backed analysis is unavailable."
         ),

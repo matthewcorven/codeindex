@@ -8,7 +8,7 @@ Recommended flow:
 
 1. Build symbols with `codeindex symbols <repo>` or MCP `build_symbol_index`.
 2. Use `codeindex doctor <repo>` or MCP `verify_repo_health` to confirm indexes are present and fresh.
-3. Use MCP `lookup_symbol` for exact symbol lookup.
+3. Use MCP `lookup_symbol` for exact-name lookup of indexed symbols.
 4. Inspect `analysisMode`, `extractor`, and `confidence`.
 5. Open only the returned file and nearby lines.
 

@@ -249,6 +249,8 @@ class RoslynHelperAdapterTests(unittest.TestCase):
         self.assertEqual(links_map, {})
         self.assertEqual(meta["actualModes"]["csharp"], "roslyn")
         self.assertEqual(meta["analysisModes"]["csharp"]["roslyn"], 1)
+        self.assertEqual(meta["analysisRuntime"]["csharp"]["helperVersion"], "0.2.0")
+        self.assertEqual(meta["analysisRuntime"]["csharp"]["timings"]["helperElapsedMs"], 8.0)
         self.assertEqual(meta["linkRecords"][0]["target"], "nuget:Newtonsoft.Json/13.0.3")
         self.assertEqual(meta["linkRecords"][0]["sourceSpan"]["endColumn"], 20)
 

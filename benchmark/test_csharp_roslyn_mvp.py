@@ -135,6 +135,10 @@ class CSharpRoslynMvpFixtureTests(unittest.TestCase):
 
         self.assertEqual(index["meta"]["actualModes"]["csharp"], "roslyn")
         self.assertEqual(symbol_index["meta"]["actualModes"]["csharp"], "roslyn")
+        self.assertIn("helperVersion", index["meta"]["analysisRuntime"]["csharp"])
+        self.assertIn("helperElapsedMs", index["meta"]["analysisRuntime"]["csharp"]["timings"])
+        self.assertIn("helperVersion", symbol_index["meta"]["analysisRuntime"]["csharp"])
+        self.assertIn("helperElapsedMs", symbol_index["meta"]["analysisRuntime"]["csharp"]["timings"])
 
         app_links = [link for link in index["links"] if link["source"] == "App/Program.cs"]
         actual_targets = {link["target"] for link in app_links}

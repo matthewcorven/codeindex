@@ -15,8 +15,8 @@ Analyzer provenance values describe how a result was produced. They are not publ
 | Language | Current extractor | Provenance | Default confidence |
 | -------- | ----------------- | ---------- | ------------------ |
 | Python | `python-ast` | `ast` | `0.95` |
-| C# with `codeindex-csharp-symbols` | `codeindex-csharp-symbols` | `roslyn` | `0.98` |
-| C# legacy regex symbols | `csharp-regex` | `regex` | `0.70` |
+| C# via source-built Roslyn helper | `codeindex-csharp-symbols` | `roslyn` | `0.98` |
+| C# regex fallback symbols | `csharp-regex` | `regex` | `0.70` |
 | JavaScript / TypeScript / Vue | `javascript-regex` | `regex` | `0.70` |
 | Go | `go-regex` | `regex` | `0.75` |
 | Java / Kotlin | `java-regex` / `kotlin-regex` | `regex` | `0.70` |

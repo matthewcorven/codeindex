@@ -468,11 +468,21 @@ def analyze(root: Path, group_map: dict) -> tuple[list[dict], list[dict], dict[t
             total_loc += loc
         nodes.append(node)
 
+    runtime_detail: dict[str, Any] = {}
+    if result.meta:
+        helper_version = result.meta.get("helperVersion")
+        if isinstance(helper_version, str) and helper_version:
+            runtime_detail["helperVersion"] = helper_version
+        timing = result.meta.get("timing")
+        if isinstance(timing, dict) and isinstance(timing.get("elapsedMs"), (int, float)):
+            runtime_detail["timings"] = {"helperElapsedMs": float(timing["elapsedMs"])}
+
     return nodes, list(result.external_nodes), {}, {
         "total_files": len(nodes),
         "total_loc": total_loc,
         "actualModes": {"csharp": "roslyn"},
         "analysisModes": {"csharp": {"roslyn": len(result.symbols or [])}},
+        "analysisRuntime": {"csharp": runtime_detail} if runtime_detail else {},
         "linkRecords": result.links,
         "diagnostics": result.diagnostics,
     }

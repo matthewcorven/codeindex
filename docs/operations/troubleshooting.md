@@ -38,7 +38,7 @@ Commands such as `impact`, `dependencies`, and `high-blast` need the dependency 
 
 ## C# Symbol Output Is Not Roslyn-Backed
 
-Current C# symbol indexing uses `codeindex-csharp-symbols` when that executable is available on `PATH`. If it is missing, times out, returns invalid JSON, or exits nonzero, current symbol entries may record legacy `csharp-regex` provenance.
+Current C# symbol indexing uses the source-built Roslyn helper by default. If the supported .NET SDK is missing, NuGet restore/build fails, the helper times out, returns invalid JSON, or exits nonzero, symbol entries may record `csharp-regex` provenance with helper diagnostics attached.
 
 Check `symbolindex.json` entries for:
 
@@ -50,7 +50,7 @@ Check `symbolindex.json` entries for:
 }
 ```
 
-That metadata is useful for understanding current symbol-index provenance, but it is not the planned C#/Razor dependency-analysis path. Planned Roslyn-backed C#/Razor support expects a usable .NET SDK and configured NuGet sources; prerequisite failures should be reported directly.
+That metadata is useful for understanding current symbol-index provenance. C# dependency analysis has stricter behavior: helper, SDK, restore, build, timeout, and JSON-contract failures are command failures so users and agents do not receive a weaker dependency graph by accident. Razor/Blazor remains metadata-only with `actualModes.razor = "deferred"`.
 
 ## Generated Files Dirty The Worktree
 

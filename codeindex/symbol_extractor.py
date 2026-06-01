@@ -365,6 +365,7 @@ _CSHARP_METHOD = re.compile(
 _CSHARP_NOISE = {"if", "for", "while", "switch", "foreach", "catch", "lock", "using", "return"}
 
 _LAST_CSHARP_HELPER_DIAGNOSTICS: dict[str, list[str]] = {}
+_LAST_CSHARP_HELPER_META: dict[str, dict] = {}
 
 
 def _remember_csharp_helper_diagnostics(path: Path, diagnostics: list[str]) -> None:
@@ -375,8 +376,22 @@ def _remember_csharp_helper_diagnostics(path: Path, diagnostics: list[str]) -> N
         _LAST_CSHARP_HELPER_DIAGNOSTICS.pop(key, None)
 
 
+def _remember_csharp_helper_meta(path: Path, meta: dict | None) -> None:
+    key = str(path)
+    if meta:
+        _LAST_CSHARP_HELPER_META[key] = meta
+    else:
+        _LAST_CSHARP_HELPER_META.pop(key, None)
+
+
 def _consume_csharp_helper_diagnostics(path: Path) -> list[str]:
     return _LAST_CSHARP_HELPER_DIAGNOSTICS.pop(str(path), [])
+
+
+def consume_csharp_helper_runtime_metadata() -> list[dict]:
+    values = list(_LAST_CSHARP_HELPER_META.values())
+    _LAST_CSHARP_HELPER_META.clear()
+    return values
 
 
 def _csharp_helper_enabled() -> bool:
@@ -392,9 +407,11 @@ def _csharp_helper_enabled() -> bool:
 def _extract_csharp_roslyn(path: Path) -> list[dict] | None:
     if not _csharp_helper_enabled():
         _remember_csharp_helper_diagnostics(path, [])
+        _remember_csharp_helper_meta(path, None)
         return None
     result = extract_csharp_symbols_with_helper(path)
     _remember_csharp_helper_diagnostics(path, result.diagnostics)
+    _remember_csharp_helper_meta(path, result.meta)
     return result.symbols
 
 

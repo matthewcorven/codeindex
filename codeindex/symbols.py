@@ -12,7 +12,12 @@ from codeindex.runtime_contract import (
     build_analysis_runtime,
     detect_dotnet_languages,
 )
-from codeindex.symbol_extractor import EXTRACTORS, SYMBOL_SCHEMA_VERSION, extract_symbols
+from codeindex.symbol_extractor import (
+    EXTRACTORS,
+    SYMBOL_SCHEMA_VERSION,
+    consume_csharp_helper_runtime_metadata,
+    extract_symbols,
+)
 
 SYMBOL_INDEX_FILENAME = "symbolindex.json"
 
@@ -127,6 +132,26 @@ def _actual_dotnet_symbol_modes(by_file: dict[str, list[dict]], dotnet_languages
     return actual_modes
 
 
+def _csharp_helper_runtime_extra(helper_meta: list[dict]) -> dict[str, dict]:
+    helper_versions = sorted({
+        meta.get("helperVersion")
+        for meta in helper_meta
+        if isinstance(meta.get("helperVersion"), str) and meta.get("helperVersion")
+    })
+    elapsed_values = [
+        float(meta["timing"]["elapsedMs"])
+        for meta in helper_meta
+        if isinstance(meta.get("timing"), dict)
+        and isinstance(meta["timing"].get("elapsedMs"), (int, float))
+    ]
+    detail: dict = {}
+    if helper_versions:
+        detail["helperVersion"] = helper_versions[-1]
+    if elapsed_values:
+        detail["timings"] = {"helperElapsedMs": round(sum(elapsed_values), 3)}
+    return {"csharp": detail} if detail else {}
+
+
 def build_symbol_index(
     repo_path: str,
     *,
@@ -135,6 +160,7 @@ def build_symbol_index(
     """Scan repo and return full symbol index dict."""
     root = Path(repo_path).resolve()
     files = _collect_files(root)
+    consume_csharp_helper_runtime_metadata()
 
     by_name: dict[str, list[dict]] = {}
     by_file: dict[str, list[dict]] = {}
@@ -159,6 +185,13 @@ def build_symbol_index(
         _actual_dotnet_symbol_modes(by_file, dotnet_languages),
         first_use_budget_seconds=first_use_budget_seconds,
     )
+    for language, detail in _csharp_helper_runtime_extra(consume_csharp_helper_runtime_metadata()).items():
+        target = analysis_runtime.setdefault(language, {})
+        for key, value in detail.items():
+            if key == "timings" and isinstance(value, dict):
+                target.setdefault("timings", {}).update(value)
+            else:
+                target[key] = value
 
     return {
         "schemaVersion": SYMBOL_SCHEMA_VERSION,

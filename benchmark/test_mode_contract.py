@@ -31,6 +31,12 @@ class ModeContractTests(unittest.TestCase):
                     "total_files": 1,
                     "total_loc": 1,
                     "actualModes": {"csharp": "roslyn"},
+                    "analysisRuntime": {
+                        "csharp": {
+                            "helperVersion": "0.2.0",
+                            "timings": {"helperElapsedMs": 5.0},
+                        },
+                    },
                     "diagnostics": [],
                 },
             )), patch("codeindex.runtime_contract.inspect_dotnet_runtime", return_value={
@@ -48,9 +54,11 @@ class ModeContractTests(unittest.TestCase):
         self.assertEqual(runtime["requestedMode"], "roslyn")
         self.assertEqual(runtime["actualMode"], "roslyn")
         self.assertEqual(runtime["helperProtocolVersion"], "1")
+        self.assertEqual(runtime["helperVersion"], "0.2.0")
         self.assertEqual(runtime["dotnetPath"], "/tmp/dotnet")
         self.assertEqual(runtime["dotnetSdkVersion"], "10.0.100")
         self.assertEqual(runtime["timings"]["firstUseBudgetSeconds"], 12.5)
+        self.assertEqual(runtime["timings"]["helperElapsedMs"], 5.0)
         self.assertEqual(runtime["diagnostics"], [])
 
     def test_analyze_csharp_repo_fails_actionably_when_roslyn_tooling_is_unavailable(self) -> None:

@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added (Unreleased)
 
-- C# symbol extraction in `codeindex symbols` (`.cs`): Roslyn-first via optional `codeindex-csharp-symbols`, with legacy regex provenance when the helper is not installed
+- C# dependency and symbol extraction (`.cs`): Roslyn-first via the source-built helper, with actionable dependency-analysis failures and regex symbol fallback provenance when helper-backed symbol extraction is unavailable
 - Schema, freshness, tool version, analyzer provenance, extractor, and confidence metadata in generated indexes
 - `get_symbol_metadata` MCP tool for agent-facing symbol provenance and confidence inspection
 - `codeindex doctor` CLI command and `verify_repo_health` MCP tool for index health, freshness, schema, and diagnostics checks

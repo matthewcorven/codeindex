@@ -4,7 +4,7 @@
 
 Add C#, Razor, and Blazor indexing that is valuable even before it is perfect, then use evidence to decide how far to invest in a Roslyn-backed implementation.
 
-The user-facing promise should be: codeindex can show dependency blast radius and symbol locations across .NET application code, Razor components, and project/package boundaries with clear confidence metadata.
+The long-term user-facing promise should be: codeindex can show dependency blast radius and symbol locations across .NET application code, Razor components, and project/package boundaries with clear confidence metadata. The current branch ships the C# portion of that promise and records Razor/Blazor as deferred runtime metadata only.
 
 ## Value Opportunity
 

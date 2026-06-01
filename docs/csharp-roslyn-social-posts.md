@@ -1,13 +1,13 @@
 # C# / Roslyn Launch Social Drafts
 
-Draft social posts for announcing the C# / Roslyn addition after it has landed upstream. These are written as launch-ready copy assuming the Roslyn-backed implementation, helper runtime contract, MCP metadata, benchmarks, and docs have all shipped successfully.
+Draft social posts for announcing the C# / Roslyn addition after it has landed upstream. These are written for the current shipped scope: Roslyn-backed C# dependency and symbol indexing, helper runtime metadata, MCP metadata, benchmarks, docs, and Razor/Blazor explicitly deferred until source mapping and component resolution are validated.
 
 ## Positioning Notes
 
 - Core message: `codeindex` now gives .NET repos a compiler-backed dependency and symbol graph.
 - Audience: AI-assisted development users, .NET teams, maintainers of large C# repos, tooling builders, MCP users.
 - Contrast carefully: position this as complementary to semantic search and editor intelligence, not as a replacement for Copilot or VS Code.
-- Reusable phrases: Roslyn-backed, compiler-aware, blast radius, MCP-ready, source spans, symbol graph, dependency graph, Razor/Blazor support.
+- Reusable phrases: Roslyn-backed, compiler-aware, blast radius, MCP-ready, source spans, symbol graph, dependency graph, Razor/Blazor deferred.
 - Prerequisite framing: C#/.NET analysis expects a usable .NET SDK and configured NuGet sources, which is normal for Roslyn-backed tooling.
 
 ## LinkedIn Posts
@@ -16,7 +16,7 @@ Draft social posts for announcing the C# / Roslyn addition after it has landed u
 
 `codeindex` now has Roslyn-backed C# support.
 
-That means C# dependency and symbol indexing is compiler-aware: projects, references, packages, symbols, overloads, partial types, generated documents, and source spans are all part of the index.
+That means C# dependency and symbol indexing is compiler-aware: projects, references, packages, symbols, partial types, aliases, generics, and source spans are all part of the index.
 
 Why this matters for AI-assisted development:
 
@@ -44,7 +44,7 @@ With Roslyn-backed indexing, `codeindex` can understand things that text scannin
 - Nested types
 - Overloads and signatures
 - Aliases and generics
-- Source-generated documents
+- Source spans
 - Symbol source spans
 
 The result is a code graph that is much closer to how the compiler sees the repo.
@@ -290,7 +290,7 @@ It builds a dependency and symbol graph that can be queried through CLI, JSON, r
 
 4/ For C#, the graph is now Roslyn-backed.
 
-That means compiler-aware handling of projects, references, packages, symbols, overloads, partial types, source-generated documents, and source spans.
+That means compiler-aware handling of projects, references, packages, symbols, aliases, generics, partial types, and source spans.
 
 5/ The runtime expectation is normal for .NET tooling: a usable SDK and configured NuGet sources.
 

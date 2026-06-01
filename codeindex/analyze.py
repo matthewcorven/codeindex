@@ -130,6 +130,7 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
     total_loc   = 0
     meta_extra  = {}
     actual_modes = {}
+    runtime_extra: dict[str, dict] = {}
     analyzer_diagnostics: list[str] = []
 
     def add_results(nodes, ext_nodes, links_map, meta):
@@ -144,6 +145,13 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
         total_files += meta.get("total_files", 0)
         total_loc   += meta.get("total_loc", 0)
         actual_modes.update(meta.get("actualModes", {}))
+        for language, detail in meta.get("analysisRuntime", {}).items():
+            target = runtime_extra.setdefault(language, {})
+            for key, value in detail.items():
+                if key == "timings" and isinstance(value, dict):
+                    target.setdefault("timings", {}).update(value)
+                else:
+                    target[key] = value
         analyzer_diagnostics.extend(meta.get("diagnostics", []))
         for key in ("framework", "packageManager"):
             if meta.get(key):
@@ -164,6 +172,13 @@ def analyze(root_path: str, *, first_use_budget_seconds: float = DEFAULT_FIRST_U
         actual_modes,
         first_use_budget_seconds=first_use_budget_seconds,
     )
+    for language, detail in runtime_extra.items():
+        target = analysis_runtime.setdefault(language, {})
+        for key, value in detail.items():
+            if key == "timings" and isinstance(value, dict):
+                target.setdefault("timings", {}).update(value)
+            else:
+                target[key] = value
 
     for node in all_nodes:
         node.setdefault("layer", assign_layer(node))

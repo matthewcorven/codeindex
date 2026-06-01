@@ -6,13 +6,13 @@ Point it at any project — Python, JavaScript/TypeScript, Go, Ruby, Rust, Java,
 
 - A `codeindex.json` dependency index written directly into your repo
 - Per-file blast-radius scores (how many files break if this one changes)
-- A `symbolindex.json` symbol map so AI can find any function/class without scanning every file
+- A `symbolindex.json` symbol map so AI can find supported function/class/type definitions without scanning every file
 - Trust metadata for symbol extraction: schema version, extractor provenance, confidence, and generation time
 - Compiler-backed Roslyn indexing for C#: project and package references, semantic dependency links, rich symbols, source spans, requested/actual mode metadata, and actionable .NET SDK diagnostics
 - Five ways to consume the data: CLI, markdown report, MCP server, pre-commit hook, CLAUDE.md injection
 - An interactive visualization UI (2D/3D graphs, dependency matrix, treemap)
 
-No build step. No npm. Pure Python stdlib — zero required dependencies.
+No npm and no required Python dependencies. C# analysis uses a source-built Roslyn helper on first C# use, so .NET repositories need a supported .NET 10 SDK and configured NuGet restore access.
 
 ---
 
@@ -38,7 +38,7 @@ pip install -e .
 # Build the dependency index
 codeindex analyze ./myapp
 
-# Build the symbol index (where every function and class lives)
+# Build the symbol index (supported functions, classes, and types)
 codeindex symbols ./myapp
 
 # See blast radius for a file before touching it
@@ -74,7 +74,7 @@ Analyzes the repo and writes `codeindex.json` to the repo root. Detects 12+ lang
 | `--watch` | off | Re-index on file changes (requires `watchdog`) |
 | `--first-use-budget-seconds` | `60` | Record the first-use Roslyn helper setup budget for C#/Razor runtime metadata |
 
-For repos that contain C# or Razor files, runtime metadata records the requested Roslyn mode, the observed actual mode, and actionable .NET SDK / NuGet prerequisites. C# analysis now uses the source-built Roslyn helper by default for dependency and symbol extraction, while fallback metadata stays truthful when helper-backed analysis is unavailable. Razor and Blazor files are detected for runtime metadata, but Phase 4 keeps their actual mode at `deferred`; codeindex does not currently claim Razor component links, generated C# documents, component tags, `_Imports.razor`, `@using`, `@inject`, code-behind partials as Razor components, or mapped Razor source spans.
+For repos that contain C# or Razor files, runtime metadata records the requested Roslyn mode, the observed actual mode, and actionable .NET SDK / NuGet prerequisites. C# dependency analysis uses the source-built Roslyn helper and fails actionably when the helper, SDK, restore, build, or JSON contract is unavailable. C# symbol extraction also prefers the helper, but can fall back to regex symbols with helper diagnostics attached. Razor and Blazor files are detected for runtime metadata only; their actual mode remains `deferred`, and codeindex does not currently claim Razor component links, generated C# documents, component tags, `_Imports.razor`, `@using`, `@inject`, code-behind partials as Razor components, or mapped Razor source spans.
 
 ---
 
@@ -86,7 +86,7 @@ codeindex symbols [REPO_PATH] [--output PATH] [--inline] [--index PATH]
                   [--first-use-budget-seconds N]
 ```
 
-Builds a symbol index — a map of every function, class, struct, and type to its exact file and line number. Lets AI tools (and humans) find any symbol in one lookup instead of scanning the entire repo.
+Builds a symbol index — a map of supported functions, classes, structs, and types to file and line number. Lets AI tools (and humans) find indexed symbols in one lookup instead of scanning the entire repo.
 
 Symbol entries include provenance metadata such as `analysisMode`, `extractor`, and `confidence`. This lets humans and agents distinguish parser/compiler-backed results from lexical extractors, with benchmark fixtures guarding the current language confidence bands.
 
@@ -194,7 +194,7 @@ codeindex serve --mcp
 | `get_dependencies` | imports + imported-by for a file |
 | `get_high_blast_files` | All files above a blast score threshold |
 | `build_symbol_index` | Build or refresh the symbol index |
-| `lookup_symbol` | Find where any function/class/type is defined (file + line) |
+| `lookup_symbol` | Find where an indexed function/class/type is defined (file + line) |
 | `get_symbol_metadata` | Inspect symbol extraction mode, extractor, and confidence |
 | `verify_repo_health` | Check index presence, schema metadata, freshness, and diagnostics |
 | `run_ci_check` | Run index health plus changed-file blast checks for PR/CI workflows |
@@ -395,13 +395,16 @@ claude mcp list
 
 > **Note:** Do not use `"command": "codeindex"` with a bare name — Claude Code does not inherit your shell PATH, so the binary won't be found unless you use the absolute path.
 
-Claude now has all 9 MCP tools available in every session. When it needs to find `processPayment`, it calls `lookup_symbol("processPayment")` and gets `src/billing.py:142` plus provenance metadata back in one shot — no file scanning.
+Claude now has all 9 MCP tools available in every session. When it needs to find an indexed symbol such as `processPayment`, it calls `lookup_symbol("processPayment")` and gets `src/billing.py:142` plus provenance metadata back in one shot — no file scanning.
 
 **Keep the index fresh:**
 
 ```bash
-# Auto-rebuild on file changes (leave running in a terminal)
-codeindex symbols . --watch
+# Auto-rebuild the dependency index on file changes (leave running in a terminal)
+codeindex analyze . --watch
+
+# Re-run symbol indexing after symbol-level changes
+codeindex symbols .
 ```
 
 ---
@@ -441,7 +444,7 @@ Then add to `CLAUDE.md`:
 
 ```markdown
 ## Codeindex
-Symbol index: `symbolindex.json` — use the `lookup_symbol` MCP tool before grepping for any function or class.
+Symbol index: `symbolindex.json` — use the `lookup_symbol` MCP tool before grepping for indexed functions, classes, or types.
 Dependency index: `codeindex.json` — use `get_impact` before modifying high-blast files.
 ```
 
@@ -493,7 +496,7 @@ codeindex impact src/auth.py
 | Ruby | `require`, `require_relative`, `autoload` | Classes, modules, methods |
 | Rust | `mod`, `use crate::` | `pub fn`, structs, enums, traits |
 | Java / Kotlin | FQN imports, wildcard imports | Classes, interfaces, methods |
-| C# | Planned Roslyn-backed project, package, and symbol references | Current symbols use `codeindex-csharp-symbols` when installed; the planned C# path requires the .NET SDK and configured NuGet sources |
+| C# | Source-built Roslyn helper for project, package, assembly, semantic reference, and source-span links | Roslyn-first symbols with `codeindex-csharp-symbols` extractor provenance; regex fallback records diagnostics when helper-backed symbol extraction is unavailable |
 | PHP | PSR-4 namespace resolution | Classes, interfaces, functions |
 | CSS / SCSS / Less | `@import`, `@use`, `@forward` | — |
 | Docker | Services, `depends_on` edges | — |
@@ -517,6 +520,11 @@ codeindex impact src/auth.py
     "total_files": 60,
     "total_loc": 4085,
     "languages": ["python", "javascript"],
+    "indexed": true,
+    "analysisModes": { "python": { "ast": 1 } },
+    "requestedModes": {},
+    "actualModes": {},
+    "analysisRuntime": {},
     "diagnostics": []
   },
   "nodes": [
@@ -563,7 +571,11 @@ The `symbols` field is only present when `codeindex symbols --inline` has been r
     "total_symbols": 312,
     "toolVersion": "0.2.0",
     "analysisModes": { "python": { "ast": 312 } },
+    "extractors": { "python-ast": 312 },
     "confidence": { "average": 0.95, "bands": { "high": 312, "medium": 0, "low": 0 } },
+    "requestedModes": {},
+    "actualModes": {},
+    "analysisRuntime": {},
     "diagnostics": []
   },
   "symbols": {
