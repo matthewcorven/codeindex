@@ -8,9 +8,12 @@ Use this as the lightweight router for the Roslyn-first C#/Razor/Blazor plan. Lo
 
 ## Current Branch Reality
 
-The current branch is a repo-intelligence foundation, not the complete Roslyn-first implementation. It currently has additive index metadata, health/CI tooling, and C# symbol extraction metadata with optional `codeindex-csharp-symbols` output plus legacy regex provenance.
+The current branch has completed the scoped Roslyn-first repo-intelligence foundation plan through Phase 5 validation. It ships additive index metadata, health/CI tooling, the source-built Roslyn helper boundary, Roslyn-backed C# dependency analysis and symbol extraction, fixture-backed precision/recall and contract coverage, and release-readiness documentation updates.
 
-C#/Razor dependency analysis, `.csproj`, `.razor`, `.cshtml` indexing, helper packaging, precision/recall scoring, and Razor source mapping remain planned work.
+Razor and Blazor remain intentionally gated as `deferred` runtime metadata rather than shipped Roslyn-backed indexing. The branch therefore represents a validated C# Roslyn foundation with explicit Razor/Blazor deferral, not full Razor component/source-mapping support.
+
+Concrete follow-on work for full Razor/Blazor delivery is tracked in `docs/workflows/razor-blazor-follow-on-implementation-plan.md`.
+Use `roslyn-first-razor-blazor-follow-on.prompt.md` when the task is to continue from the validated C# foundation into shipped Razor/Blazor support.
 
 ## Global Guardrails
 
@@ -31,6 +34,10 @@ C#/Razor dependency analysis, `.csproj`, `.razor`, `.cshtml` indexing, helper pa
 4. Use `roslyn-first-phase-3-csharp-mvp.prompt.md` to implement C# Roslyn dependency and symbol MVP behavior.
 5. Use `roslyn-first-phase-4-razor-spike.prompt.md` to spike and gate Razor/Blazor support.
 6. Use `roslyn-first-phase-5-validation-release.prompt.md` to run release-grade validation, docs cleanup, and final readiness checks.
+
+## Follow-On Router
+
+Once the validated C# foundation is complete and the next work is full Razor/Blazor delivery, switch to `roslyn-first-razor-blazor-follow-on.prompt.md` and follow phases `F0` through `F6` in `docs/workflows/razor-blazor-follow-on-implementation-plan.md`.
 
 ## Baseline Validation
 

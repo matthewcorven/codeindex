@@ -6,6 +6,8 @@ Add C#, Razor, and Blazor indexing that is valuable even before it is perfect, t
 
 The long-term user-facing promise should be: codeindex can show dependency blast radius and symbol locations across .NET application code, Razor components, and project/package boundaries with clear confidence metadata. The current branch ships the C# portion of that promise and records Razor/Blazor as deferred runtime metadata only.
 
+The concrete follow-on delivery plan for moving Razor/Blazor from `deferred` to shipped Roslyn-backed support now lives in `docs/workflows/razor-blazor-follow-on-implementation-plan.md`.
+
 ## Value Opportunity
 
 Strong C# and Blazor support expands codeindex into a large enterprise ecosystem where dependency questions are expensive to answer manually. The highest-value workflows are:
